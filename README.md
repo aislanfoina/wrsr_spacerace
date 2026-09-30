@@ -1,5 +1,9 @@
 # Space Race for Workers & Resources: Soviet Republic
 
+![A Vostok on Gagarin's Start, the MIK behind it and the plants that feed it](docs/images/cosmodrome.jpg)
+
+*A cosmodrome in an ordinary republic. The Americans have not been told.*
+
 ## COMRADE, THE AMERICANS ARE BUILDING A ROCKET!
 
 Your republic pours concrete by the thousand tonnes, bakes bread for a million citizens and
@@ -41,10 +45,14 @@ waits politely in any ordinary republic. An Early Start (1920) game reaches it b
     stand, oxygen and propellant plants, instrument works and a spacecraft hall.
   - Flight and crew: the Pluton tracking station, Star City, OKB-1 and a recovery field.
   - Two monuments, so the republic can admire itself.
+
+  ![The sixteen buildings of the Space Race Kit](docs/images/buildings.jpg)
 - **Five rockets:** R-7 Sputnik, Vostok-K, Soyuz, Proton and the N1. The MIK builds them from
   rocket stages, engines and avionics, then rolls them out onto the pad it is linked to.
   The N1 needs the heavy complex; the others launch from Gagarin's Start. No amount of
   pushing will fit an N1 onto an R-7 pad.
+
+  ![R-7 Sputnik, Vostok-K, Soyuz, Proton and the N1, with a comrade for scale](docs/images/rockets.jpg)
 - **Six new goods, if the republic wants them,** each with its own industry chain: rocket
   stages, rocket engines, avionics, liquid oxygen, hypergolic propellant and spacecraft.
   The truck drivers have been briefed and sworn to secrecy. They are off unless you switch
@@ -92,6 +100,8 @@ has reviewed that result and expects eight.
    probe onwards up to three tracking stations must follow the flight.
 5. **Stand well back.**
 
+![A Vostok-K in the arms of Gagarin's Start](docs/images/pad_r7.jpg)
+
 The programme takes the fuel and payload from those buildings, and the rocket climbs away
 on a column of flame and smoke.
 
@@ -108,6 +118,10 @@ Or it doesn't.
   fire brigade. In a game with building fires switched off, the pad closes for 30 days of
   repairs instead.
 - **The press.** Either way, TASS will not be mentioning it.
+
+![The N1 on Site 110](docs/images/pad_n1.jpg)
+
+*The N1 on Site 110. Historically: four launches, four explosions, zero press releases.*
 
 ## NOT INCLUDED
 
@@ -187,6 +201,8 @@ python tools/space_research.py         # research branch, names and icons (needs
 python tools/build_space.py inis       # only the buildings' ini files, stand-in and new-goods variants
 python tools/space_scenario.py         # the programme template + launches.ini, checked by tools/vmcheck.py (needs the renders)
 python tools/space_settings.py         # spacerace.ini's balance part and data/defaults.ini, from all of the above
+python tools/space_workshop.py         # the seven Workshop items' configs and store pages, and kit_item
+python tools/readme_images.py          # the pictures in this README (renders in Blender, then docs/images)
 python tools/space_goods_icons.py      # icons of the new goods
 python tools/space_layout.py           # checks every truck bay against the building models
 python tools/port_resources.py         # re-ports the TesmioLoader resources plugin
@@ -205,7 +221,7 @@ mod/buildings/space_kit/ the 16 buildings (generated)
 mod/vehicles/sr_*/       the five rockets (generated)
 tools/                   generators, checks and reverse-engineering helpers
 tools/dev/               in-game test helpers (read/write a running game's memory)
-docs/                    the design document, including what was verified in game and how
+docs/                    the design document, including what was verified in game and how; images/ for this page
 vendor/TesmioLoader/     the loader API headers and the resources plugin source it was ported from
 ```
 
