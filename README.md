@@ -100,6 +100,16 @@ vendor/TesmioLoader/     the loader API headers and the resources plugin source 
 `docs/space-race-design.md` is the long version: the design, every engine address the
 plugins rely on, and the test history.
 
+## Branches
+
+| Branch | What | How changes get in |
+|---|---|---|
+| `unstable` | day-to-day work; may not build | pushed to directly |
+| `dev` | the next release, tested in game | pull request from `unstable`, approved by two maintainers |
+| `main` | releases | pull request from `dev`, approved by @aislanfoina (code owner) |
+
+`dev` and `main` are protected: no direct pushes, force pushes or deletions.
+
 ## Licence and credits
 
 GPL-3.0 — see `LICENSE`. The resources plugin is a port of the one in
