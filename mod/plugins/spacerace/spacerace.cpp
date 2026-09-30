@@ -37,6 +37,20 @@
 //      make one at placement did not take for our pads, so a post-hook on
 //      TickAllBuildings links every unlinked launch pad (object sr_pad_*) to the
 //      nearest MIK (object sr_mik) within link_range metres.
+//
+//   6. Settings. spacerace_data\defaults.ini (generated, every value) and then
+//      spacerace.ini (the player's copy, same syntax) set the balance:
+//      - [research] years and costs, applied while the merged research.ini is built;
+//      - [building:<object>] costs, staff and production. The building-type loader
+//        opens every building.ini with the same fopen import (0x10E37E), so a kit
+//        building's file is served as a patched copy in spacerace_data\buildings;
+//      - [rocket_parts] the MIK bills;
+//      - the programme: data\programme\race.tmpl has @tokens@ for [america],
+//        [milestones], [rockets], [launches] and [rewards]. It is rendered at start
+//        into scenarios\spacerace\race_<hash>\, a mission per set of rules: a save
+//        keeps its running script, so a game keeps the rules it began with. Each
+//        mission carries rules.ini (launch radius and loads), which the plugin reads
+//        whenever a world loads.
 
 #include "../../../vendor/TesmioLoader/src/tesmio_api.h"
 
@@ -115,6 +129,144 @@ static void LogLine(const char* fmt, ...)
     H->log("%s", buf);
 }
 
+// --------------------------------------------------------------- settings ----
+//
+// [section] then key = value, ';' starts a comment. defaults.ini is read first and
+// spacerace.ini second; the last line for a key wins.
+
+struct Setting { char sec[48]; char key[48]; char val[240]; };
+#define MAX_SETTINGS 1024
+static Setting g_set[MAX_SETTINGS];
+static int     g_nset;
+
+static void Trim(char* s)
+{
+    char* e = s + strlen(s);
+    while (e > s && (e[-1] == ' ' || e[-1] == '\t' || e[-1] == '\r' || e[-1] == '\n')) *--e = 0;
+    char* b = s;
+    while (*b == ' ' || *b == '\t') ++b;
+    if (b != s) memmove(s, b, strlen(b) + 1);
+}
+
+static int ReadSettings(const char* path)
+{
+    FILE* f = NULL;
+    if (fopen_s(&f, path, "r") != 0 || !f) return 0;
+    char line[512], sec[48] = "";
+    int n = 0;
+    while (fgets(line, sizeof line, f))
+    {
+        char* semi = strchr(line, ';'); if (semi) *semi = 0;
+        Trim(line);
+        if (!line[0]) continue;
+        if (line[0] == '[')
+        {
+            char* e = strchr(line, ']'); if (e) *e = 0;
+            strncpy_s(sec, sizeof sec, line + 1, _TRUNCATE);
+            Trim(sec);
+            continue;
+        }
+        char* eq = strchr(line, '='); if (!eq) continue;
+        *eq = 0; char* key = line; char* val = eq + 1;
+        Trim(key); Trim(val);
+        if (!key[0] || g_nset >= MAX_SETTINGS) continue;
+        Setting* s = &g_set[g_nset++];
+        strncpy_s(s->sec, sizeof s->sec, sec, _TRUNCATE);
+        strncpy_s(s->key, sizeof s->key, key, _TRUNCATE);
+        strncpy_s(s->val, sizeof s->val, val, _TRUNCATE);
+        ++n;
+    }
+    fclose(f);
+    return n;
+}
+
+static const char* Get(const char* sec, const char* key)
+{
+    for (int i = g_nset - 1; i >= 0; --i)
+        if (_stricmp(g_set[i].key, key) == 0 && _stricmp(g_set[i].sec, sec) == 0) return g_set[i].val;
+    return NULL;
+}
+
+static int HasSection(const char* sec)
+{
+    for (int i = 0; i < g_nset; ++i)
+        if (_stricmp(g_set[i].sec, sec) == 0) return 1;
+    return 0;
+}
+
+static float GetF(const char* sec, const char* key, float def) { const char* v = Get(sec, key); return v && v[0] ? (float)atof(v) : def; }
+static int   GetI(const char* sec, const char* key, int def)   { const char* v = Get(sec, key); return v && v[0] ? atoi(v) : def; }
+
+struct GoodT { char name[32]; float t; };
+
+// "fuel 8, lox 20" -> { fuel 8 } { lox 20 }; returns how many
+static int Pairs(const char* s, GoodT* out, int max)
+{
+    char buf[240];
+    strncpy_s(buf, sizeof buf, s ? s : "", _TRUNCATE);
+    int n = 0;
+    char* ctx = NULL;
+    for (char* part = strtok_s(buf, ",", &ctx); part && n < max; part = strtok_s(NULL, ",", &ctx))
+    {
+        char name[32] = { 0 };
+        float v = 0.0f;
+        if (sscanf_s(part, " %31s %f", name, (unsigned)sizeof name, &v) == 2)
+        {
+            strcpy_s(out[n].name, sizeof out[n].name, name);
+            out[n].t = v;
+            ++n;
+        }
+    }
+    return n;
+}
+
+// the number after `name` in a pairs string ("year 1946, cost 2500"), if there is one
+static int PairValue(const char* s, const char* name, float* v)
+{
+    GoodT p[16];
+    int n = Pairs(s, p, 16);
+    for (int i = 0; i < n; ++i)
+        if (_stricmp(p[i].name, name) == 0) { *v = p[i].t; return 1; }
+    return 0;
+}
+
+// new_goods (spacerace.ini [general]): 1 = the six goods of the resources plugin, which change the
+// save format; 0 = vanilla stand-ins (launches.ini "standin" lines), so any save loads.
+static int g_newGoods = 0;
+struct Standin { char good[32]; char as[32]; };
+static Standin g_standin[16];
+static int     g_nstandin;
+
+static const char* StandIn(const char* good)
+{
+    if (!g_newGoods)
+        for (int i = 0; i < g_nstandin; ++i)
+            if (_stricmp(g_standin[i].good, good) == 0) return g_standin[i].as;
+    return good;
+}
+
+// stand-in names, goods that became the same good added up, and any good in drop[] left out
+static int MapGoods(GoodT* g, int n, const GoodT* drop, int ndrop)
+{
+    int m = 0;
+    for (int i = 0; i < n; ++i)
+    {
+        char name[32];
+        strncpy_s(name, sizeof name, StandIn(g[i].name), _TRUNCATE);
+        int skip = 0;
+        for (int k = 0; k < ndrop && !skip; ++k) skip = _stricmp(drop[k].name, name) == 0;
+        if (skip) continue;
+        int j = 0;
+        while (j < m && _stricmp(g[j].name, name) != 0) ++j;
+        if (j < m) { g[j].t += g[i].t; continue; }
+        float t = g[i].t;
+        strcpy_s(g[m].name, sizeof g[m].name, name);
+        g[m].t = t;
+        ++m;
+    }
+    return m;
+}
+
 // ------------------------------------------------------------------ files ----
 
 static char* ReadAll(const char* path, size_t* len)
@@ -132,6 +284,15 @@ static char* ReadAll(const char* path, size_t* len)
     buf[got] = 0;
     if (len) *len = got;
     return buf;
+}
+
+static int WriteAll(const char* path, const char* text, size_t n)
+{
+    FILE* f = NULL;
+    if (fopen_s(&f, path, "wb") != 0 || !f) return 0;
+    size_t w = fwrite(text, 1, n, f);
+    fclose(f);
+    return w == n;
 }
 
 static int SameFile(const char* a, const char* b)
@@ -229,6 +390,55 @@ static char* Inject(char* text, const char* parent, const char* child, int* ok)
     return text;
 }
 
+// [research]: <entry> = year Y, cost C for any entry, year_shift on every year, cost_scale on every cost
+static char* ResearchSettings(const char* text, int* touched)
+{
+    int shift = GetI("research", "year_shift", 0);
+    float scale = GetF("research", "cost_scale", 1.0f);
+    if (scale <= 0.0f) scale = 1.0f;
+    size_t n = strlen(text);
+    char* out = (char*)malloc(n + 8192);
+    if (!out) return NULL;
+    char* o = out;
+    char entry[64] = "";
+    const char* set = NULL;
+    *touched = 0;
+    for (const char* p = text; *p; )
+    {
+        const char* eol = strchr(p, '\n');
+        size_t len = eol ? (size_t)(eol - p + 1) : strlen(p);
+        if (strncmp(p, "$RESEARCH ", 10) == 0)
+        {
+            entry[0] = 0;
+            sscanf_s(p + 10, "%63s", entry, (unsigned)sizeof entry);
+            set = Get("research", entry);
+            if (set) ++*touched;
+        }
+        float v;
+        if (strncmp(p, "$YEAR ", 6) == 0)
+        {
+            v = (float)atoi(p + 6);
+            if (set) PairValue(set, "year", &v);
+            o += sprintf_s(o, 64, "$YEAR %d\r\n", (int)v + shift);
+        }
+        else if (strncmp(p, "$COST ", 6) == 0)
+        {
+            v = (float)atoi(p + 6);
+            if (set) PairValue(set, "cost", &v);
+            int c = (int)(v * scale + 0.5f);
+            o += sprintf_s(o, 64, "$COST %d\r\n", c < 1 ? 1 : c);
+        }
+        else
+        {
+            memcpy(o, p, len);
+            o += len;
+        }
+        p += len;
+    }
+    *o = 0;
+    return out;
+}
+
 // test mode: $COST scaled down, $YEAR dropped, and the first entry marked $AVAILABLE so the
 // branch can be researched at once in any start year, without the vanilla engineering chain
 static char* TestFilter(const char* text)
@@ -301,6 +511,14 @@ static int BuildResearch(void)
     if (!ours) { free(text); LogLine("spacerace  no research_space.ini - research branch not added"); return 0; }
     char* ours2 = Replace(ours, "{KIT}", g_kit);
     free(ours);
+    if (ours2)
+    {
+        int touched = 0;
+        char* s = ResearchSettings(ours2, &touched);
+        if (s) { free(ours2); ours2 = s; }
+        LogLine("spacerace  research settings: %d entries set, years %+d, costs x%.2f", touched,
+                GetI("research", "year_shift", 0), GetF("research", "cost_scale", 1.0f));
+    }
     if (g_test && ours2)
     {
         char* t = TestFilter(ours2);
@@ -337,12 +555,178 @@ static int IsResearchIni(const char* path)
     return (n == t) || p[-1] == '/' || p[-1] == '\\';
 }
 
+// ------------------------------------------------------------- buildings ----
+//
+// [building:<object>] for the kit's buildings (and [buildings] cost_scale for all):
+//   cost        auto = the model-sized cost the kit ships with (scaled by cost_scale), or absolute
+//               amounts "workers 12000, concrete 800, steel 300, asphalt 50" (workers = workdays)
+//   workers, educated          $WORKERS_NEEDED, $PROFESORS_NEEDED
+//   production, consumption    "<good> <rate>, ..." for $PRODUCTION / $CONSUMPTION
+// The game opens each building.ini once while it loads the building types.
+
+static int g_buildingsPatched;
+
+// "...\<kit item>\<object>\building.ini" -> object
+static int KitBuildingOf(const char* path, char* obj, size_t objLen)
+{
+    size_t n = strlen(path);
+    if (n < 14 || _stricmp(path + n - 12, "building.ini") != 0) return 0;
+    const char* e = path + n - 13;                       // the separator before building.ini
+    if (*e != '\\' && *e != '/') return 0;
+    const char* b = e;
+    while (b > path && b[-1] != '\\' && b[-1] != '/') --b;
+    if (b == e || (size_t)(e - b) >= objLen || b - 1 <= path) return 0;
+    const char* ke = b - 1;
+    const char* kb = ke;
+    while (kb > path && kb[-1] != '\\' && kb[-1] != '/') --kb;
+    size_t kl = (size_t)(ke - kb);
+    if (kl != strlen(g_kit) || _strnicmp(kb, g_kit, kl) != 0) return 0;
+    memcpy(obj, b, (size_t)(e - b));
+    obj[e - b] = 0;
+    return 1;
+}
+
+static int StartsWord(const char* p, const char* word)
+{
+    size_t n = strlen(word);
+    return strncmp(p, word, n) == 0 && (p[n] == ' ' || p[n] == '\t' || p[n] == '\r' || p[n] == '\n' || !p[n]);
+}
+
+// construction phases for absolute costs, the way the kit's auto costs are laid out
+static char* CostBlock(char* o, const GoodT* g, int n, float scale)
+{
+    static const char* kPhase[3] = { "$COST_WORK SOVIET_CONSTRUCTION_GROUNDWORKS 0.0",
+                                     "$COST_WORK SOVIET_CONSTRUCTION_SKELETON_CASTING 1.0",
+                                     "$COST_WORK SOVIET_CONSTRUCTION_STEEL_LAYING 1.0" };
+    for (int ph = 0; ph < 3; ++ph)
+    {
+        int any = 0;
+        for (int i = 0; i < n; ++i)
+        {
+            int gph = (_stricmp(g[i].name, "asphalt") == 0 || _stricmp(g[i].name, "gravel") == 0) ? 0
+                    : _stricmp(g[i].name, "steel") == 0 ? 2 : 1;
+            if (gph != ph || g[i].t <= 0.0f) continue;
+            if (!any) o += sprintf_s(o, 160, "%s\r\n$COST_WORK_BUILDING_ALL\r\n", kPhase[ph]);
+            any = 1;
+            if (_stricmp(g[i].name, "workers") == 0)
+                o += sprintf_s(o, 96, "$COST_RESOURCE workers %d\r\n", (int)(g[i].t * scale + 0.5f));
+            else
+                o += sprintf_s(o, 96, "$COST_RESOURCE %s %.1f\r\n", g[i].name, g[i].t * scale);
+        }
+    }
+    return o;
+}
+
+static char* RateLines(char* o, const char* directive, const GoodT* g, int n)
+{
+    for (int i = 0; i < n; ++i) o += sprintf_s(o, 96, "%s %s %.4f\r\n", directive, g[i].name, g[i].t);
+    return o;
+}
+
+// writes the patched building.ini to out (spacerace_data\buildings\<object>.ini); 0 = serve the original
+static int PatchBuilding(const char* path, const char* obj, char* out, size_t outLen)
+{
+    char sec[80];
+    _snprintf_s(sec, sizeof sec, _TRUNCATE, "building:%s", obj);
+    float scale = GetF("buildings", "cost_scale", 1.0f) * GetF(sec, "cost_scale", 1.0f);
+    // the kit's building.ini has vanilla stand-in goods; with the new goods the variant made with
+    // them (tools/space_scene.py) is the starting point instead
+    char goodsIni[MAX_PATH];
+    const char* base = path;
+    _snprintf_s(goodsIni, sizeof goodsIni, _TRUNCATE, "%sgoods_buildings\\%s.ini", g_data, obj);
+    if (g_newGoods && GetFileAttributesA(goodsIni) != INVALID_FILE_ATTRIBUTES) base = goodsIni;
+    if (!HasSection(sec) && scale == 1.0f && base == path) return 0;
+    char* text = ReadAll(base, NULL);
+    if (!text) return 0;
+    const char* cost = Get(sec, "cost");
+    const char* workers = Get(sec, "workers");
+    const char* educated = Get(sec, "educated");
+    const char* prod = Get(sec, "production");
+    const char* cons = Get(sec, "consumption");
+    GoodT cg[16], pg[8], ng[8];
+    int ncg = (cost && _stricmp(cost, "auto") != 0) ? Pairs(cost, cg, 16) : 0;
+    int npg = prod ? Pairs(prod, pg, 8) : 0, nng = cons ? Pairs(cons, ng, 8) : 0;
+    // settings name the new goods; with stand-ins a factory never uses what it makes (the kit's
+    // own rule), and a recipe left with nothing keeps the building's own lines
+    npg = MapGoods(pg, npg, NULL, 0);
+    nng = MapGoods(ng, nng, g_newGoods ? NULL : pg, g_newGoods ? 0 : npg);
+    if (!npg) prod = NULL;
+    if (!nng) cons = NULL;
+    size_t n = strlen(text);
+    char* buf = (char*)malloc(n + 8192);
+    if (!buf) { free(text); return 0; }
+    char* o = buf;
+    int costDone = 0, prodDone = 0, consDone = 0;
+    for (const char* p = text; *p; )
+    {
+        const char* eol = strchr(p, '\n');
+        size_t len = eol ? (size_t)(eol - p + 1) : strlen(p);
+        if (strncmp(p, "$COST_", 6) == 0 && ncg)
+        {
+            if (!costDone) o = CostBlock(o, cg, ncg, scale);
+            costDone = 1;
+        }
+        else if ((StartsWord(p, "$COST_RESOURCE_AUTO") || StartsWord(p, "$COST_RESOURCE")) && scale != 1.0f)
+        {
+            char d[32] = { 0 }, g[48] = { 0 };
+            float v = 0.0f;
+            if (sscanf_s(p, "%31s %47s %f", d, (unsigned)sizeof d, g, (unsigned)sizeof g, &v) == 3)
+                o += sprintf_s(o, 128, "%s %s %.2f\r\n", d, g, v * scale);
+            else { memcpy(o, p, len); o += len; }
+        }
+        else if (StartsWord(p, "$WORKERS_NEEDED") && workers)
+            o += sprintf_s(o, 64, "$WORKERS_NEEDED %d\r\n", atoi(workers));
+        else if (StartsWord(p, "$PROFESORS_NEEDED") && educated)
+            o += sprintf_s(o, 64, "$PROFESORS_NEEDED %d\r\n", atoi(educated));
+        else if (StartsWord(p, "$PRODUCTION") && prod)
+        {
+            if (!prodDone) o = RateLines(o, "$PRODUCTION", pg, npg);
+            prodDone = 1;
+        }
+        else if (StartsWord(p, "$CONSUMPTION") && cons)
+        {
+            if (!consDone) o = RateLines(o, "$CONSUMPTION", ng, nng);
+            consDone = 1;
+        }
+        else
+        {
+            memcpy(o, p, len);
+            o += len;
+        }
+        p += len;
+    }
+    *o = 0;
+    char dir[MAX_PATH];
+    _snprintf_s(dir, sizeof dir, _TRUNCATE, "%sbuildings", g_data);
+    CreateDirectoryA(dir, NULL);
+    _snprintf_s(out, outLen, _TRUNCATE, "%s\\%s.ini", dir, obj);
+    int ok = WriteAll(out, buf, (size_t)(o - buf));
+    free(buf); free(text);
+    if (!ok) { LogLine("spacerace  cannot write %s - %s keeps its own building.ini", out, obj); return 0; }
+    ++g_buildingsPatched;
+    LogLine("spacerace  building %s (%s goods): cost %s x%.2f%s%s%s%s", obj, base == path ? "stand-in" : "new", ncg ? "absolute" : "auto", scale,
+            workers ? ", workers set" : "", educated ? ", educated set" : "", prod ? ", production set" : "", cons ? ", consumption set" : "");
+    return 1;
+}
+
 static FILE* __cdecl DetourFopen(const char* path, const char* mode)
 {
     if (path && g_merged[0] && IsResearchIni(path))
     {
         FILE* f = g_origFopen(g_merged, mode);
         if (f) return f;
+    }
+    char obj[64], patched[MAX_PATH];
+    if (path && mode && mode[0] == 'r' && KitBuildingOf(path, obj, sizeof obj))
+    {
+        int ok = 0;
+        __try { ok = PatchBuilding(path, obj, patched, sizeof patched); }
+        __except (H->faultFilter("spacerace", GetExceptionInformation())) { ok = 0; }
+        if (ok)
+        {
+            FILE* f = g_origFopen(patched, mode);
+            if (f) return f;
+        }
     }
     return g_origFopen(path, mode);
 }
@@ -421,23 +805,16 @@ static void AutoStart(void)
     LogLine("spacerace  ordinary game: auto-starting scenario %s / %s", g_scenario, g_mission);
 }
 
+static void ApplyRules(void);
+
 static void* DetourEnum(void* a, void* b, void* c, void* d)
 {
-    __try { AutoStart(); }
+    __try { AutoStart(); ApplyRules(); }
     __except (H->faultFilter("spacerace", GetExceptionInformation())) {}
     return g_origEnum(a, b, c, d);
 }
 
 // ----------------------------------------------------------------- config ----
-
-static void Trim(char* s)
-{
-    char* e = s + strlen(s);
-    while (e > s && (e[-1] == ' ' || e[-1] == '\t' || e[-1] == '\r' || e[-1] == '\n')) *--e = 0;
-    char* b = s;
-    while (*b == ' ' || *b == '\t') ++b;
-    if (b != s) memmove(s, b, strlen(b) + 1);
-}
 
 static void LoadConfig(void)
 {
@@ -457,28 +834,21 @@ static void LoadConfig(void)
     _snprintf_s(g_media, sizeof g_media, _TRUNCATE, "%smedia_soviet\\", exe);
 
     char path[MAX_PATH];
+    _snprintf_s(path, sizeof path, _TRUNCATE, "%sdefaults.ini", g_data);
+    int nd = ReadSettings(path);
     _snprintf_s(path, sizeof path, _TRUNCATE, "%sspacerace.ini", g_dir);
-    FILE* f = NULL;
-    if (fopen_s(&f, path, "r") != 0 || !f) { LogLine("spacerace  no spacerace.ini - defaults"); return; }
-    char line[256];
-    while (fgets(line, sizeof line, f))
-    {
-        char* semi = strchr(line, ';'); if (semi) *semi = 0;
-        Trim(line);
-        if (!line[0] || line[0] == '[') continue;
-        char* eq = strchr(line, '='); if (!eq) continue;
-        *eq = 0; char* key = line; char* val = eq + 1;
-        Trim(key); Trim(val);
-        if      (_stricmp(key, "kit_item") == 0)  strncpy_s(g_kit, sizeof g_kit, val, _TRUNCATE);
-        else if (_stricmp(key, "autostart") == 0) g_autostart = atoi(val);
-        else if (_stricmp(key, "research") == 0)  g_research = atoi(val);
-        else if (_stricmp(key, "scenario") == 0)  strncpy_s(g_scenario, sizeof g_scenario, val, _TRUNCATE);
-        else if (_stricmp(key, "mission") == 0)   strncpy_s(g_mission, sizeof g_mission, val, _TRUNCATE);
-        else if (_stricmp(key, "test_mode") == 0) g_test = atoi(val);
-        else if (_stricmp(key, "test_cost") == 0) { float v = (float)atof(val); if (v > 0.0f) g_testCost = v; }
-        else if (_stricmp(key, "link_range") == 0) { float v = (float)atof(val); if (v > 0.0f) g_linkRange = v; }
-    }
-    fclose(f);
+    int ns = ReadSettings(path);
+    LogLine("spacerace  settings: %d defaults, %d from spacerace.ini", nd, ns);
+    const char* v;
+    if ((v = Get("general", "kit_item")) != NULL)  strncpy_s(g_kit, sizeof g_kit, v, _TRUNCATE);
+    if ((v = Get("general", "scenario")) != NULL)  strncpy_s(g_scenario, sizeof g_scenario, v, _TRUNCATE);
+    if ((v = Get("general", "mission")) != NULL)   strncpy_s(g_mission, sizeof g_mission, v, _TRUNCATE);
+    g_autostart = GetI("general", "autostart", g_autostart);
+    g_research  = GetI("general", "research", g_research);
+    g_test      = GetI("general", "test_mode", g_test);
+    g_newGoods  = GetI("general", "new_goods", 0) != 0;
+    float f = GetF("general", "test_cost", g_testCost);  if (f > 0.0f) g_testCost = f;
+    f = GetF("general", "link_range", g_linkRange);     if (f > 0.0f) g_linkRange = f;
 }
 
 // ------------------------------------------------------------ pad links ----
@@ -586,7 +956,6 @@ static void LinkPads(unsigned char* ctx)
 #define MAX_LAUNCHES       8
 
 #define MAX_GOODS          6
-struct GoodT { char name[32]; float t; };
 struct RocketLoad
 {
     char  object[32];
@@ -596,6 +965,9 @@ struct RocketLoad
 };
 static RocketLoad g_rocket[MAX_ROCKETS];
 static int   g_nrocket;
+static GoodT g_legacyLoad[MAX_ROCKETS][MAX_GOODS];   // launches.ini's loads, for legacy missions
+static int   g_legacyNload[MAX_ROCKETS];
+static float g_legacyRadius = 450.0f;
 // added goods scripts may read: the name -> Resources-field chain (SOVIET64 0x59B3F0) knows only the
 // base game's names, so these are answered with the spare fields _Resources_reserved_16_.._19_
 static char  g_vmGoods[4][32];
@@ -648,6 +1020,16 @@ static void Fx(char* name, float x, float y, float z, float dy)
     g_spawn(fx, pos, dir, 1, 1.0f, 1.0f, 0);
 }
 
+// a rocket's launch load, goods named as the settings name them, taken as the current goods
+static void SetLoad(int ri, const GoodT* g, int n)
+{
+    RocketLoad* r = &g_rocket[ri];
+    if (n > MAX_GOODS) n = MAX_GOODS;
+    memcpy(r->load, g, sizeof(GoodT) * (size_t)n);
+    r->nload = n;
+    for (int k = 0; k < n; ++k) strncpy_s(r->load[k].name, sizeof r->load[k].name, StandIn(g[k].name), _TRUNCATE);
+}
+
 static void LoadLaunches(void)
 {
     char path[MAX_PATH];
@@ -694,6 +1076,12 @@ static void LoadLaunches(void)
             g_nvm = 0;
             for (int k = 1; k < n && g_nvm < 4; ++k) strncpy_s(g_vmGoods[g_nvm++], 32, tok[k], _TRUNCATE);
         }
+        else if (_stricmp(key, "standin") == 0 && n >= 3 && g_nstandin < 16)
+        {
+            strncpy_s(g_standin[g_nstandin].good, 32, tok[1], _TRUNCATE);
+            strncpy_s(g_standin[g_nstandin].as, 32, tok[2], _TRUNCATE);
+            ++g_nstandin;
+        }
         else if (_stricmp(key, "radius") == 0) g_launchRadius = (float)atof(a);
         else if (_stricmp(key, "climb_seconds") == 0) g_climbSeconds = (float)atof(a);
         else if (_stricmp(key, "fx_flame") == 0) strncpy_s(g_fxFlame, 32, a, _TRUNCATE);
@@ -702,10 +1090,358 @@ static void LoadLaunches(void)
         else if (_stricmp(key, "fx_boom") == 0)  strncpy_s(g_fxBoom, 32, a, _TRUNCATE);
     }
     fclose(f);
+    // the loads and radius as launches.ini has them (new-goods names): the rules of the frozen legacy missions
+    for (int i = 0; i < g_nrocket; ++i)
+    {
+        memcpy(g_legacyLoad[i], g_rocket[i].load, sizeof g_legacyLoad[i]);
+        g_legacyNload[i] = g_rocket[i].nload;
+        SetLoad(i, g_legacyLoad[i], g_legacyNload[i]);
+    }
+    g_legacyRadius = g_launchRadius;
+    // spacerace.ini: what the MIK builds each rocket from - with the new goods; with stand-ins the
+    // game's own bill (vanilla parts from the rocket's weight) stays
+    for (int i = 0; i < g_nrocket; ++i)
+    {
+        const char* parts = Get("rocket_parts", g_rocket[i].object);
+        if (parts) g_rocket[i].nbill = Pairs(parts, g_rocket[i].bill, MAX_GOODS);
+        if (!g_newGoods) g_rocket[i].nbill = 0;
+    }
+    float climb = GetF("launches", "climb_seconds", g_climbSeconds);
+    if (climb >= 2.0f && climb <= 120.0f) g_climbSeconds = climb;
     int bills = 0;
     for (int i = 0; i < g_nrocket; ++i) bills += g_rocket[i].nbill > 0;
-    LogLine("spacerace  launches: %d rockets (%d with a bill of parts), %d goods visible to scripts, storages within %.0f m, %.0f s climb",
-            g_nrocket, bills, g_nvm, g_launchRadius, g_climbSeconds);
+    LogLine("spacerace  launches (%s goods): %d rockets (%d with a bill of parts), %d goods visible to scripts, storages within %.0f m, %.0f s climb",
+            g_newGoods ? "new" : "stand-in", g_nrocket, bills, g_newGoods ? g_nvm : 0, g_launchRadius, g_climbSeconds);
+}
+
+// ------------------------------------------------------------ programme ----
+//
+// data\programme\race.tmpl is the programme with @tokens@ (tools/space_scenario.py lists them in
+// milestones.txt). The tokens come from the settings; the rendered script goes to its own mission,
+// scenarios\spacerace\<mission>_<hash>, with rules.ini beside it, and new games start that mission.
+
+struct Token { char name[24]; char val[64]; };
+#define MAX_TOKENS 256
+static Token g_tok[MAX_TOKENS];
+static int   g_ntok;
+
+static void TokS(const char* name, const char* v)
+{
+    if (g_ntok >= MAX_TOKENS) return;
+    strncpy_s(g_tok[g_ntok].name, sizeof g_tok[g_ntok].name, name, _TRUNCATE);
+    strncpy_s(g_tok[g_ntok].val, sizeof g_tok[g_ntok].val, v, _TRUNCATE);
+    ++g_ntok;
+}
+static void TokI(const char* name, int v) { char b[32]; sprintf_s(b, sizeof b, "%d", v); TokS(name, b); }
+// floats as tools/space_scenario.py writes them: two decimals, a negative one as 0.0 - x
+static void TokF(const char* name, float v)
+{
+    char b[48];
+    if (v < 0.0f) sprintf_s(b, sizeof b, "0.0 - %.2f", -v); else sprintf_s(b, sizeof b, "%.2f", v);
+    TokS(name, b);
+}
+static void TokIdx(char* out, size_t n, const char* base, int i) { _snprintf_s(out, n, _TRUNCATE, "%s_%d", base, i); }
+
+static const int kMonthDays[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+static const char* kMonths[12] = { "January", "February", "March", "April", "May", "June", "July", "August",
+                                   "September", "October", "November", "December" };
+
+// "1969-07-20" -> year, day of a 365-day year (1-365), day and month; "never" -> 0
+static int ParseDate(const char* s, int* y, int* doy, int* d, int* m)
+{
+    if (!s || _stricmp(s, "never") == 0) return 0;
+    if (sscanf_s(s, "%d-%d-%d", y, m, d) != 3 || *m < 1 || *m > 12 || *d < 1) return 0;
+    if (*d > kMonthDays[*m - 1]) *d = kMonthDays[*m - 1];
+    *doy = *d;
+    for (int i = 0; i < *m - 1; ++i) *doy += kMonthDays[i];
+    return 1;
+}
+
+static int RocketIndex(const char* obj)
+{
+    for (int i = 0; i < g_nrocket; ++i)
+        if (_stricmp(g_rocket[i].object, obj) == 0) return i;
+    return -1;
+}
+
+// a rocket's launch load from [rockets], else launches.ini
+static int RocketLoadOf(int ri, GoodT* out)
+{
+    const char* s = Get("rockets", g_rocket[ri].object);
+    if (s) return Pairs(s, out, MAX_GOODS);
+    memcpy(out, g_legacyLoad[ri], sizeof(GoodT) * MAX_GOODS);
+    return g_legacyNload[ri];
+}
+
+static float LoadOf(const GoodT* g, int n, const char* good)
+{
+    for (int i = 0; i < n; ++i)
+        if (_stricmp(g[i].name, good) == 0) return g[i].t;
+    return 0.0f;
+}
+
+static int MakeTokens(char goods[5][32], char keys[][24], char rockets[][32], int nm)
+{
+    char name[32];
+    int shift = GetI("america", "year_shift", 0);
+    for (int i = 0; i < nm; ++i)
+    {
+        int y = 0, doy = 1, d = 1, m = 1;
+        const char* date = Get("america", keys[i]);
+        if (ParseDate(date, &y, &doy, &d, &m)) y += shift; else { y = 9999; doy = 1; }
+        TokIdx(name, sizeof name, "us_year", i); TokI(name, y);
+        TokIdx(name, sizeof name, "us_day0", i); TokI(name, doy - 1);
+        if (i == nm - 1)
+        {
+            char when[64];
+            if (y < 9999) sprintf_s(when, sizeof when, "by %d %s %d", d, kMonths[m - 1], y);
+            else strcpy_s(when, sizeof when, "one day");
+            TokS("moon_when", when);
+        }
+        const char* ms = Get("milestones", keys[i]);
+        float fail = 30.0f, crew = 0.0f, track = 0.0f;
+        if (ms) { PairValue(ms, "failure", &fail); PairValue(ms, "crew", &crew); PairValue(ms, "tracking", &track); }
+        TokIdx(name, sizeof name, "fail", i); TokI(name, (int)fail);
+        TokIdx(name, sizeof name, "crew", i); TokI(name, (int)crew < 0 ? 0 : (int)crew);
+        TokIdx(name, sizeof name, "track", i); TokI(name, (int)track < 0 ? 0 : (int)track);
+        int ri = RocketIndex(rockets[i]);
+        GoodT load[MAX_GOODS];
+        int nl = ri >= 0 ? RocketLoadOf(ri, load) : 0;
+        static const char* kLoad[5] = { "fuel", "lox", "hyper", "craft", "food" };
+        float v[5];
+        for (int k = 0; k < 5; ++k)
+        {
+            v[k] = LoadOf(load, nl, goods[k]);
+            if (v[k] < 0.0f) v[k] = 0.0f;
+            TokIdx(name, sizeof name, kLoad[k], i); TokF(name, v[k]);
+        }
+        TokIdx(name, sizeof name, "prop", i); TokF(name, v[0] + v[1] + v[2]);
+    }
+    // the Resources field the script reads each load from: a stand-in's own field, or for a new
+    // good the spare field the ResourceField hook answers it with (vm_goods order)
+    static const char* kField[5] = { "field_fuel", "field_lox", "field_hyper", "field_craft", "field_food" };
+    for (int k = 0; k < 5; ++k)
+    {
+        char f[40];
+        strncpy_s(f, sizeof f, StandIn(goods[k]), _TRUNCATE);
+        if (g_newGoods)
+            for (int v = 0; v < g_nvm; ++v)
+                if (_stricmp(goods[k], g_vmGoods[v]) == 0) sprintf_s(f, sizeof f, "_Resources_reserved_%d_", 16 + v);
+        TokS(kField[k], f);
+    }
+    TokS("craft_icon", StandIn(goods[3]));
+    float radius = GetF("launches", "radius", g_legacyRadius);
+    TokF("radius", radius); TokI("radius_m", (int)(radius + 0.5f));
+    TokF("park", GetF("launches", "park_distance", 90.0f));
+    TokI("repair_days", GetI("launches", "pad_repair_days", 30));
+    TokI("per_success", GetI("launches", "failure_per_success", 5));
+    TokI("test_stand", GetI("launches", "failure_test_stand", 10));
+    TokI("nk33", GetI("launches", "failure_nk33", 35));
+    TokI("fail_min", GetI("launches", "failure_min", 5));
+    int money;
+    money = GetI("rewards", "first_money", 25000);    TokI("first_money", money < 0 ? 0 : money);
+    money = GetI("rewards", "second_money", 5000);    TokI("second_money", money < 0 ? 0 : money);
+    money = GetI("rewards", "victory_money", 100000); TokI("victory_money", money < 0 ? 0 : money);
+    TokF("first_loyalty", GetF("rewards", "first_loyalty", 12.0f) / 100.0f);
+    TokF("second_loyalty", GetF("rewards", "second_loyalty", 3.0f) / 100.0f);
+    TokF("us_first_loyalty", GetF("rewards", "america_first_loyalty", -5.0f) / 100.0f);
+    TokF("victory_loyalty", GetF("rewards", "victory_loyalty", 20.0f) / 100.0f);
+    // the script knows test stands and tracking stations by their staff
+    TokI("stand_workers", GetI("building:sr_test_stand", "workers", 80));
+    TokI("stand_educated", GetI("building:sr_test_stand", "educated", 40));
+    TokI("track_workers", GetI("building:sr_tracking", "workers", 40));
+    TokI("track_educated", GetI("building:sr_tracking", "educated", 30));
+    return g_ntok;
+}
+
+static char* Render(const char* tmpl, int* unknown)
+{
+    size_t n = strlen(tmpl);
+    char* out = (char*)malloc(n * 2 + 65536);
+    if (!out) return NULL;
+    char* o = out;
+    *unknown = 0;
+    for (const char* p = tmpl; *p; )
+    {
+        if (*p == '@')
+        {
+            const char* e = p + 1;
+            while ((*e >= 'a' && *e <= 'z') || (*e >= '0' && *e <= '9') || *e == '_') ++e;
+            if (*e == '@' && e > p + 1 && e - p - 1 < 24)
+            {
+                char name[24];
+                memcpy(name, p + 1, (size_t)(e - p - 1));
+                name[e - p - 1] = 0;
+                int found = 0;
+                for (int i = 0; i < g_ntok && !found; ++i)
+                    if (strcmp(g_tok[i].name, name) == 0)
+                    {
+                        size_t l = strlen(g_tok[i].val);
+                        memcpy(o, g_tok[i].val, l); o += l;
+                        found = 1;
+                    }
+                if (!found) { if (!*unknown) LogLine("spacerace  programme template: no value for @%s@", name); ++*unknown; }
+                p = e + 1;
+                continue;
+            }
+        }
+        *o++ = *p++;
+    }
+    *o = 0;
+    return out;
+}
+
+static unsigned long long Fnv(const char* s, unsigned long long h)
+{
+    for (; *s; ++s) { h ^= (unsigned char)*s; h *= 1099511628211ull; }
+    return h;
+}
+
+// copies script.ini and the window images of the template folder
+static int CopyProgrammeFiles(const char* src, const char* dst)
+{
+    char pat[MAX_PATH];
+    _snprintf_s(pat, sizeof pat, _TRUNCATE, "%s\\*", src);
+    WIN32_FIND_DATAA fd;
+    HANDLE h = FindFirstFileA(pat, &fd);
+    if (h == INVALID_HANDLE_VALUE) return 0;
+    int n = 0;
+    do
+    {
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+        const char* ext = strrchr(fd.cFileName, '.');
+        if (!ext || (_stricmp(ext, ".png") != 0 && _stricmp(fd.cFileName, "script.ini") != 0)) continue;
+        char s[MAX_PATH], d[MAX_PATH];
+        _snprintf_s(s, sizeof s, _TRUNCATE, "%s\\%s", src, fd.cFileName);
+        _snprintf_s(d, sizeof d, _TRUNCATE, "%s\\%s", dst, fd.cFileName);
+        if (!SameFile(s, d) && CopyFileA(s, d, FALSE)) ++n;
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+    return n;
+}
+
+static void BuildProgramme(void)
+{
+    char path[MAX_PATH];
+    _snprintf_s(path, sizeof path, _TRUNCATE, "%sprogramme\\milestones.txt", g_data);
+    char* meta = ReadAll(path, NULL);
+    _snprintf_s(path, sizeof path, _TRUNCATE, "%sprogramme\\race.tmpl", g_data);
+    char* tmpl = ReadAll(path, NULL);
+    if (!meta || !tmpl)
+    {
+        free(meta); free(tmpl);
+        LogLine("spacerace  no programme template - new games run the legacy mission %s", g_mission);
+        return;
+    }
+    char goods[5][32] = { "fuel", "lox", "hypergolic", "spacecraft", "food" };
+    char keys[16][24], rockets[16][32];
+    int nm = 0;
+    char* ctx = NULL;
+    for (char* line = strtok_s(meta, "\r\n", &ctx); line; line = strtok_s(NULL, "\r\n", &ctx))
+    {
+        if (strncmp(line, "goods ", 6) == 0)
+            sscanf_s(line + 6, "%31s %31s %31s %31s %31s", goods[0], 32, goods[1], 32, goods[2], 32, goods[3], 32, goods[4], 32);
+        else if (strncmp(line, "milestone ", 10) == 0 && nm < 16 &&
+                 sscanf_s(line + 10, "%23s %31s", keys[nm], 24, rockets[nm], 32) == 2)
+            ++nm;
+    }
+    free(meta);
+    MakeTokens(goods, keys, rockets, nm);
+    int unknown = 0;
+    char* src = Render(tmpl, &unknown);
+    free(tmpl);
+    if (!src || unknown)
+    {
+        free(src);
+        LogLine("spacerace  programme template has %d unfilled token(s) - new games run the legacy mission %s", unknown, g_mission);
+        return;
+    }
+    // the launch rules the plugin applies while this mission runs
+    char rules[4096];
+    char* r = rules;
+    r += sprintf_s(r, 256, "; written by the spacerace plugin from spacerace.ini: the launch rules of this programme\r\nradius %.2f\r\n",
+                   GetF("launches", "radius", g_legacyRadius));
+    for (int i = 0; i < g_nrocket && r - rules < 3500; ++i)
+    {
+        GoodT load[MAX_GOODS];
+        int nl = RocketLoadOf(i, load);
+        r += sprintf_s(r, 64, "load %s", g_rocket[i].object);
+        for (int k = 0; k < nl; ++k) r += sprintf_s(r, 64, " %s %.2f", load[k].name, load[k].t);
+        r += sprintf_s(r, 4, "\r\n");
+    }
+    unsigned long long h = Fnv(rules, Fnv(src, 14695981039346656037ull));
+    char mission[64];
+    _snprintf_s(mission, sizeof mission, _TRUNCATE, "%s_%08x", g_mission, (unsigned)(h ^ (h >> 32)));
+    char dir[MAX_PATH], file[MAX_PATH];
+    _snprintf_s(dir, sizeof dir, _TRUNCATE, "%sscenarios\\%s\\%s", g_media, g_scenario, mission);
+    CreateDirectoryA(dir, NULL);
+    _snprintf_s(file, sizeof file, _TRUNCATE, "%s\\race.txt", dir);
+    size_t have = 0;
+    char* old = ReadAll(file, &have);
+    int fresh = !old || strcmp(old, src) != 0;
+    free(old);
+    int ok = 1;
+    if (fresh) ok = WriteAll(file, src, strlen(src));
+    _snprintf_s(file, sizeof file, _TRUNCATE, "%s\\rules.ini", dir);
+    ok = ok && WriteAll(file, rules, strlen(rules));
+    _snprintf_s(path, sizeof path, _TRUNCATE, "%sprogramme", g_data);
+    int copied = CopyProgrammeFiles(path, dir);
+    if (!ok) { free(src); LogLine("spacerace  cannot write %s - new games run the legacy mission %s", dir, g_mission); return; }
+    strncpy_s(g_mission, sizeof g_mission, mission, _TRUNCATE);
+    LogLine("spacerace  programme: %d milestones, %d settings -> mission %s (%s, %d file(s) copied)", nm, g_ntok, mission,
+            fresh ? "written" : "unchanged", copied);
+    free(src);
+}
+
+// On every world load: the running programme's rules.ini sets the launch radius and loads;
+// a legacy mission (no rules.ini) gets launches.ini's.
+static char g_rulesFor[64] = "?";
+
+static void ApplyRules(void)
+{
+    unsigned char* base = H->exeBase;
+    if (!H->readablePtr(base + RVA_SCEN_NAME, 0x20) || !H->readablePtr(base + RVA_SCEN_MISSION, 0x20)) return;
+    size_t ns = 0, nm = 0;
+    const char* s = StdString(base + RVA_SCEN_NAME, &ns);
+    const char* m = StdString(base + RVA_SCEN_MISSION, &nm);
+    char scen[64] = { 0 }, mis[64] = { 0 };
+    if (ns < sizeof scen && H->readablePtr(s, ns)) memcpy(scen, s, ns);
+    if (nm < sizeof mis && H->readablePtr(m, nm)) memcpy(mis, m, nm);
+    if (strcmp(mis, g_rulesFor) == 0) return;
+    strncpy_s(g_rulesFor, sizeof g_rulesFor, mis, _TRUNCATE);
+    for (int i = 0; i < g_nrocket; ++i) SetLoad(i, g_legacyLoad[i], g_legacyNload[i]);
+    g_launchRadius = g_legacyRadius;
+    char path[MAX_PATH];
+    _snprintf_s(path, sizeof path, _TRUNCATE, "%sscenarios\\%s\\%s\\rules.ini", g_media, scen, mis);
+    FILE* f = NULL;
+    if (!scen[0] || _stricmp(scen, g_scenario) != 0 || fopen_s(&f, path, "r") != 0 || !f)
+    {
+        if (scen[0] && _stricmp(scen, g_scenario) == 0) LogLine("spacerace  mission %s has no rules.ini - launches.ini loads", mis);
+        return;
+    }
+    char line[512];
+    while (fgets(line, sizeof line, f))
+    {
+        char tok[16][32]; int n = 0;
+        for (char* c = NULL, *t = strtok_s(line, " \t\r\n", &c); t && n < 16; t = strtok_s(NULL, " \t\r\n", &c))
+            strncpy_s(tok[n++], 32, t, _TRUNCATE);
+        if (n >= 2 && strcmp(tok[0], "radius") == 0) g_launchRadius = (float)atof(tok[1]);
+        else if (n >= 2 && strcmp(tok[0], "load") == 0)
+        {
+            int ri = RocketIndex(tok[1]);
+            if (ri < 0) continue;
+            GoodT load[MAX_GOODS];
+            int nl = 0;
+            for (int k = 2; k + 1 < n && nl < MAX_GOODS; k += 2)
+            {
+                strncpy_s(load[nl].name, 32, tok[k], _TRUNCATE);
+                load[nl++].t = (float)atof(tok[k + 1]);
+            }
+            SetLoad(ri, load, nl);
+        }
+    }
+    fclose(f);
+    LogLine("spacerace  mission %s: launch rules from its rules.ini, storages within %.0f m", mis, g_launchRadius);
 }
 
 static const RocketLoad* RocketOf(unsigned char* v)
@@ -1058,14 +1794,14 @@ extern "C" __declspec(dllexport) int TsmPluginStart(void)
     InstallData();
     LoadStrings();
     LoadLaunches();
+    BuildProgramme();
     int hooks = 0;
-    if (g_research && BuildResearch())
-    {
-        if (H->patchIat(H->exeBase, "api-ms-win-crt-stdio-l1-1-0.dll", "fopen", (void*)&DetourFopen, (void**)&g_origFopen, "spacerace fopen"))
-            ++hooks;
-        else
-            LogLine("spacerace  could not swap the fopen import - research branch not added");
-    }
+    // one fopen swap serves the merged research.ini and the kit's patched building.ini files
+    if (!(g_research && BuildResearch())) g_merged[0] = 0;
+    if (H->patchIat(H->exeBase, "api-ms-win-crt-stdio-l1-1-0.dll", "fopen", (void*)&DetourFopen, (void**)&g_origFopen, "spacerace fopen"))
+        ++hooks;
+    else
+        LogLine("spacerace  could not swap the fopen import - research branch and building settings not applied");
     if (H->patchIat(H->exeBase, "C3DDLL64.dll", "?GetString@C3D_LANGUAGE@@QEAAPEA_WH@Z", (void*)&DetourGetString, (void**)&g_origGetString, "spacerace GetString"))
         ++hooks;
     else
@@ -1085,7 +1821,7 @@ extern "C" __declspec(dllexport) int TsmPluginStart(void)
     }
     // other RML plugins (helicopter distribution office, rolling stock road transport) hook this
     // too, with a 14-byte absolute jump (FF 25 00000000 <address>): chain on exactly that jump
-    if (g_nvm)
+    if (g_newGoods && g_nvm)          // stand-in goods have fields of their own
     {
         unsigned char liveRes[15];
         const unsigned char* expectRes = LiveOrPristine(H->exeBase + RVA_RES_FIELD, kResFieldPro, 15, liveRes, "spacerace ResourceField");
@@ -1117,8 +1853,9 @@ extern "C" __declspec(dllexport) int TsmPluginStart(void)
         ++hooks;
     else
         LogLine("spacerace  TickAllBuildings hook not installed - launch pads will not be linked to the MIK");
-    LogLine("spacerace  active: %d/%d hooks, %d strings, autostart %s, pads link to a MIK within %.0f m, launch effects %s",
-            hooks, g_nvm ? 6 : 5, g_nstr, g_autostart ? "on" : "off", g_linkRange, (g_getEffect && g_spawn) ? "on" : "OFF (exports not found)");
+    LogLine("spacerace  active: %d/%d hooks, %s goods, %d strings, autostart %s, pads link to a MIK within %.0f m, launch effects %s",
+            hooks, (g_newGoods && g_nvm) ? 6 : 5, g_newGoods ? "new" : "stand-in", g_nstr, g_autostart ? "on" : "off", g_linkRange,
+            (g_getEffect && g_spawn) ? "on" : "OFF (exports not found)");
     return 0;
 }
 

@@ -45,9 +45,12 @@ waits politely in any ordinary republic. An Early Start (1920) game reaches it b
   rocket stages, engines and avionics, then rolls them out onto the pad it is linked to.
   The N1 needs the heavy complex; the others launch from Gagarin's Start. No amount of
   pushing will fit an N1 onto an R-7 pad.
-- **Six new goods,** each with its own industry chain: rocket stages, rocket engines,
-  avionics, liquid oxygen, hypergolic propellant and spacecraft. The truck drivers have
-  been briefed and sworn to secrecy.
+- **Six new goods, if the republic wants them,** each with its own industry chain: rocket
+  stages, rocket engines, avionics, liquid oxygen, hypergolic propellant and spacecraft.
+  The truck drivers have been briefed and sworn to secrecy. They are off unless you switch
+  them on (see *Saves*), and the programme then runs on the goods your republic already
+  trades in: chemicals for the oxygen, mechanical components for the rocket parts,
+  electronics for the spacecraft.
 - **Cosmonauts: a fourth education tier.** Graduates aged 23 to 35 in good health who work at
   Star City join a class of 40. After about a year they come out as *experts*
   (education 3+). OKB-1 turns engineers aged 30 to 65 into chief designers the same way,
@@ -55,8 +58,9 @@ waits politely in any ordinary republic. An Early Start (1920) game reaches it b
   not leave without cosmonauts. The tier is a separate plugin that other mods can reuse,
   in case other ministries also want experts.
 - **The programme:** eight milestones raced against the real American timeline. Getting
-  there first pays in dollars, loyalty and prestige. Coming second costs prestige.
-  Whenever the Americans get somewhere first, a notification tells you so.
+  there first pays in dollars and loyalty; getting there second pays less. Whenever the
+  Americans get somewhere first, a notification tells you so and the citizens take it
+  personally.
 
 ## THE EIGHT-POINT PLAN
 
@@ -111,7 +115,29 @@ Or it doesn't.
   prefers them.
 - No orbital mechanics. The rocket goes up; space takes it from there.
 - No promise that the N1 flies. The real one launched four times and exploded four times.
-- No switching an existing republic over. See *Saves* below.
+
+## THE PLAN IS NEGOTIABLE
+
+Every number above is a recommendation from the Central Committee, not a law of physics.
+They all live in `mod/plugins/spacerace/spacerace.ini`, which comes with every value
+filled in and explained. Change one and restart the game:
+
+| Section | What it controls |
+|---|---|
+| `[general]` | the switches: test mode, the new goods, the programme starting itself |
+| `[research]` | the year each space entry opens and its cost, one by one or all at once (`year_shift`, `cost_scale`) |
+| `[america]` | the day the Americans reach each milestone, shifted as a whole or set to `never` |
+| `[milestones]` | failure chance, cosmonauts and tracking stations for each milestone |
+| `[rockets]` | what each launch takes from the storages near its pad |
+| `[rocket_parts]` | what the MIK builds each rocket from |
+| `[launches]` | supply radius, repair time, and how fast experience and test stands make launches safer |
+| `[rewards]` | the dollars and loyalty for coming first, second, or not at all |
+| `[buildings]`, `[building:<name>]` | construction cost (sized from the model, or absolute: workdays and tonnes), staff and recipes of every building |
+
+Research, buildings and rocket parts change in every game, saves included. The programme's
+rules are fixed when a game starts: a republic keeps the rules it began with, so tampering
+with the timeline cannot break a race already under way. New games take the new rules.
+Cosmonaut training (how long, how many, who) is in `mod/plugins/experts/experts.ini`.
 
 ## REQUIREMENTS
 
@@ -124,9 +150,11 @@ Or it doesn't.
   and Blender 5.2 (`tools/build_space.py`). Only the reverse-engineering helpers in
   `tools/` need `capstone`.
 
-**Saves:** the new goods change the save format. A republic started with this mod needs it
-to load, and republics started without it will not load with it. The Party recommends a
-fresh start, and a backup, like the Party always does.
+**Saves:** out of the box (`new_goods = 0` in `spacerace.ini`) the mod adds no goods, and
+your existing republic can join the race as it is. The six new goods (`new_goods = 1`)
+change the save format: switch them on for a new game, because older saves will not load
+with them and a game started with them needs them. Never switch them off under a save
+that has them. The Party recommends a backup either way, like the Party always does.
 
 ## BUILD AND INSTALL
 
@@ -156,7 +184,9 @@ so run `build_space.py` first (it leaves them in `build/space` and `build/space_
 python tools/build_space.py            # textures, building kit, rockets, previews (needs Blender)
 python tools/build_space.py kit mik    # one stage for some buildings only
 python tools/space_research.py         # research branch, names and icons (needs the renders)
-python tools/space_scenario.py         # the programme script + launches.ini, checked by tools/vmcheck.py (needs the renders)
+python tools/build_space.py inis       # only the buildings' ini files, stand-in and new-goods variants
+python tools/space_scenario.py         # the programme template + launches.ini, checked by tools/vmcheck.py (needs the renders)
+python tools/space_settings.py         # spacerace.ini's balance part and data/defaults.ini, from all of the above
 python tools/space_goods_icons.py      # icons of the new goods
 python tools/space_layout.py           # checks every truck bay against the building models
 python tools/port_resources.py         # re-ports the TesmioLoader resources plugin

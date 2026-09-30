@@ -20,7 +20,9 @@ header = '''// resources.cpp - ported from vendor/TesmioLoader/plugins/resources
 //   - the hooks are installed in TsmPluginStart, like every other plugin RML hosts;
 //   - safe defaults with no ini: inject (hook = 2), no customhouse hook (survivors owns
 //     that tick), no price table in the log (RML's logger mishandles width specifiers);
-//   - H->provide is optional.
+//   - H->provide is optional;
+//   - spacerace.ini beside this DLL switches it: [general] new_goods = 0 adds nothing, so
+//     saves stay the base game's (without a spacerace.ini it always runs).
 // tools/port_resources.py regenerates this file from the vendored one.
 
 '''
@@ -68,6 +70,15 @@ extern "C" __declspec(dllexport) int TsmPluginStart(void)
     }
     g_baseDir = g_selfDir;                      // the ini and the log live beside the DLL
     _snprintf_s(g_iniFile, sizeof g_iniFile, _TRUNCATE, "%s\\\\resources.ini", g_selfDir);
+
+    // the Space Race's switch for its new goods: off, nothing is added and saves stay the base game's
+    char spacerace[MAX_PATH];
+    _snprintf_s(spacerace, sizeof spacerace, _TRUNCATE, "%s\\\\spacerace.ini", g_selfDir);
+    if (GetFileAttributesA(spacerace) != INVALID_FILE_ATTRIBUTES && GetPrivateProfileIntA("general", "new_goods", 0, spacerace) == 0)
+    {
+        Logf("resource  spacerace.ini new_goods = 0 - no mod resources, saves stay the base game's");
+        return 0;
+    }
 ''')
 rep('''    H->provide(TSM_SERVICE_RESOURCES, TSM_RESOURCES_VERSION, &kResourceApi);''',
     '''    if (H->provide) H->provide(TSM_SERVICE_RESOURCES, TSM_RESOURCES_VERSION, &kResourceApi);''')
