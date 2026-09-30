@@ -70,7 +70,7 @@ The programme sleeps until you research the Rocket Research Institute, so it wai
 Requires Workers & Resources: Soviet Republic [b]1.1.1.9[/b]: the plugins patch this exact build.
 
 [h2]SAVES[/h2]
-Out of the box ([b]new_goods = 0[/b]) the mod adds no goods, and your existing republic can join the race as it is: liquid oxygen travels as chemicals, rocket parts as mechanical components and spacecraft as electronics. The six new goods ([b]new_goods = 1[/b]) change the save format: switch them on for a new game, and never switch them off under a save that has them. The Party recommends a backup either way.
+Out of the box ([b]new_goods = 0[/b]) the mod adds no goods, and your existing republic can join the race as it is: liquid oxygen travels as chemicals, rocket parts as mechanical components and spacecraft as electronics. The six new goods ([b]new_goods = 1[/b]) can be switched on for an existing republic too: load it and they join the economy. Switched off again, whatever is in stock becomes its stand-in and the next save is a plain one. Save once after each switch, and keep a backup: the Party always does.
 
 [h2]THE PLAN IS NEGOTIABLE[/h2]
 Every number is a recommendation from the Central Committee, not a law of physics. [b]plugins\\spacerace.ini[/b] in this item's folder holds them all, explained: research years and costs, the day the Americans reach each milestone (or never), failure chances, cosmonauts and tracking stations, launch loads, rocket parts, rewards, and the cost, staff and recipes of every building. A running republic keeps the programme rules it began with, so tampering with the timeline cannot break a race already under way. (Steam replaces the file when the mod updates: keep a copy of your changes.)

@@ -43,6 +43,21 @@ def line(key, value, note=None, width=34):
     return '%-*s ; %s' % (width, s, note) if note else s
 
 
+def kit_costs():
+    """object -> [(good, amount)]: the game's own cost of each kit building (tools/space_kit_costs.txt),
+    workdays first, then goods by weight."""
+    out = {}
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'space_kit_costs.txt')
+    for line in open(path, encoding='utf-8'):
+        if line.startswith('#') or not line.strip():
+            continue
+        ident, rest = line.split(None, 1)
+        items = [(g, int(v)) for g, v in (p.split() for p in rest.split(','))]
+        items.sort(key=lambda x: (x[0] != 'workers', -x[1]))
+        out[ident.split('/')[-1]] = items
+    return out
+
+
 def building(obj):
     """What a kit building says with the new goods (the settings name them; the plugin maps them to
     stand-ins when new_goods = 0): name, type, staff, production, consumption."""
@@ -134,8 +149,9 @@ def balance():
     a(line('cost_scale', '1.0', 'multiplies the construction cost of every Space Race building', 26))
     a(';')
     a('; [building:<object>] for each one:')
-    a(';   cost         auto = sized from the model, the way the kit ships; or absolute amounts,')
-    a(';                e.g. workers 20000, concrete 900, steel 350, asphalt 60 (workers = workdays)')
+    a(';   cost         absolute amounts: workers = workdays, then tonnes of each good. The defaults')
+    a(';                are what the game makes of the kit\'s own model-sized costs; the plugin spreads')
+    a(';                them over the ground works, casting and steel phases. auto = the model-sized cost.')
     a(';   cost_scale   multiplies this building\'s cost')
     a(';   workers      staff it needs; educated = how many of them need a university education')
     a(';   production   <good> <tonnes per worker per day>, ...  (factories)')
@@ -143,11 +159,12 @@ def balance():
     a(';                slot in the building, which only the kit generator can add)')
     a('; Recipes name the new goods; with new_goods = 0 each is read as its stand-in, and an input')
     a('; that becomes the factory\'s own output is left out.')
+    costs = kit_costs()
     for obj in KIT_ORDER:
         b = building(obj)
         a('')
         a('[building:%s]%s; %s' % (obj, ' ' * max(1, 26 - len(obj)), b['name']))
-        a('cost = auto')
+        a('cost = ' + (pairs(costs[obj]) if obj in costs else 'auto'))
         if b['workers'] is not None:
             a('workers = %d' % b['workers'])
         if b['educated'] is not None:

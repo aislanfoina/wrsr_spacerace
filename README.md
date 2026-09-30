@@ -165,10 +165,11 @@ Cosmonaut training (how long, how many, who) is in `mod/plugins/experts/experts.
   `tools/` need `capstone`.
 
 **Saves:** out of the box (`new_goods = 0` in `spacerace.ini`) the mod adds no goods, and
-your existing republic can join the race as it is. The six new goods (`new_goods = 1`)
-change the save format: switch them on for a new game, because older saves will not load
-with them and a game started with them needs them. Never switch them off under a save
-that has them. The Party recommends a backup either way, like the Party always does.
+your existing republic can join the race as it is. The six new goods (`new_goods = 1`) can
+be switched on for an existing republic too: load it and they join the economy. Switching
+them off again is allowed: whatever is in stock is requisitioned as its stand-in (chemicals,
+mechanical components, electronics) and the next save is a plain one. Save once after each
+switch. The Party recommends a backup either way, like the Party always does.
 
 ## BUILD AND INSTALL
 

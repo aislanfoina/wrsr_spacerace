@@ -592,26 +592,40 @@ static int StartsWord(const char* p, const char* word)
     return strncmp(p, word, n) == 0 && (p[n] == ' ' || p[n] == '\t' || p[n] == '\r' || p[n] == '\n' || !p[n]);
 }
 
-// construction phases for absolute costs, the way the kit's auto costs are laid out
+// Absolute costs go into the kit's three construction phases, each good split between them the way
+// the game spreads the kit's auto costs (read from a running game with build/costdump.py): ground
+// works take the gravel and asphalt, casting the bricks and boards, steel laying the mechanical
+// components; workdays, concrete and steel are shared. The total is exactly what the setting says.
 static char* CostBlock(char* o, const GoodT* g, int n, float scale)
 {
     static const char* kPhase[3] = { "$COST_WORK SOVIET_CONSTRUCTION_GROUNDWORKS 0.0",
                                      "$COST_WORK SOVIET_CONSTRUCTION_SKELETON_CASTING 1.0",
                                      "$COST_WORK SOVIET_CONSTRUCTION_STEEL_LAYING 1.0" };
+    struct Split { const char* good; float share[3]; };
+    static const Split kSplit[] = {
+        { "workers",     { 0.20f, 0.45f, 0.35f } },
+        { "concrete",    { 0.15f, 0.85f, 0.00f } },
+        { "steel",       { 0.00f, 0.60f, 0.40f } },
+        { "gravel",      { 1.00f, 0.00f, 0.00f } },
+        { "asphalt",     { 1.00f, 0.00f, 0.00f } },
+        { "mcomponents", { 0.00f, 0.00f, 1.00f } },
+    };
     for (int ph = 0; ph < 3; ++ph)
     {
         int any = 0;
         for (int i = 0; i < n; ++i)
         {
-            int gph = (_stricmp(g[i].name, "asphalt") == 0 || _stricmp(g[i].name, "gravel") == 0) ? 0
-                    : _stricmp(g[i].name, "steel") == 0 ? 2 : 1;
-            if (gph != ph || g[i].t <= 0.0f) continue;
+            float share = ph == 1 ? 1.0f : 0.0f;                  // anything else is cast with the skeleton
+            for (int s = 0; s < (int)(sizeof kSplit / sizeof kSplit[0]); ++s)
+                if (_stricmp(g[i].name, kSplit[s].good) == 0) share = kSplit[s].share[ph];
+            float t = g[i].t * scale * share;
+            if (t <= 0.0f) continue;
             if (!any) o += sprintf_s(o, 160, "%s\r\n$COST_WORK_BUILDING_ALL\r\n", kPhase[ph]);
             any = 1;
             if (_stricmp(g[i].name, "workers") == 0)
-                o += sprintf_s(o, 96, "$COST_RESOURCE workers %d\r\n", (int)(g[i].t * scale + 0.5f));
+                o += sprintf_s(o, 96, "$COST_RESOURCE workers %d\r\n", (int)(t + 0.5f));
             else
-                o += sprintf_s(o, 96, "$COST_RESOURCE %s %.1f\r\n", g[i].name, g[i].t * scale);
+                o += sprintf_s(o, 96, "$COST_RESOURCE %s %.1f\r\n", g[i].name, t);
         }
     }
     return o;
