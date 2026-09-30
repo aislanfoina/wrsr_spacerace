@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "space-race.resources",
+  "name": "Space Race goods",
+  "version": "0.1.0",
+  "author": "Aislan",
+  "description": "Six goods the base game does not have - rocket stages, rocket engines, avionics, liquid oxygen, hypergolic propellant, spacecraft - through the TesmioLoader resources plugin, ported for RML. Changes the save format: games with these goods need them to load.",
+  "dll": "resources.dll",
+  "loaderApi": {
+    "min": 1,
+    "max": 1
+  },
+  "supportedGameVersions": [
+    "1.1.1.9"
+  ],
+  "requiredSymbols": [],
+  "optionalSymbols": [],
+  "hookIntents": [
+    {
+      "symbol": "wrsr.observed.rva_002aa830",
+      "interaction": "pre-hook",
+      "phase": "runtime",
+      "temperature": "UNKNOWN"
+    },
+    {
+      "symbol": "wrsr.observed.rva_002a9340",
+      "interaction": "pre-hook",
+      "phase": "runtime",
+      "temperature": "UNKNOWN"
+    }
+  ],
+  "dependencies": [],
+  "conflicts": [],
+  "loadBefore": [],
+  "loadAfter": [],
+  "defaultPriority": 9760,
+  "enabledByDefault": true
+}

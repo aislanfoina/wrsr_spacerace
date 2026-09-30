@@ -1,0 +1,34 @@
+591000	Rocket Research Institute (NII-88)
+591001	The captured V-2 is studied, copied as the R-1 and outgrown. A research institute for long-range rockets opens the space branch of the tree.
+591002	Liquid Rocket Engines
+591003	Turbopump-fed kerosene and liquid oxygen engines. Unlocks the Rocket Engine Works and the Engine Test Stand: every engine is fired once before it flies.
+591004	Cryogenic Oxygen
+591005	Air separation on an industrial scale. Unlocks the Oxygen-Nitrogen Plant. Liquid oxygen boils away: produce it close to the pad.
+591006	Radio Guidance and Telemetry
+591007	Gyroscopes, radio control and telemetry. Unlocks the Instrument Works.
+591008	The R-7 Semyorka
+591009	Korolev's two-stage intercontinental rocket: a core and four strap-on boosters, twenty engines lit on the ground. Unlocks the Rocket Plant, the MIK and the R-7 Launch Complex.
+591010	Artificial Earth Satellite
+591011	A simple satellite before the Americans fly theirs. Unlocks the Spacecraft Assembly Hall, the Deep Space Tracking Station and the Sputnik mission.
+591012	Biological Satellites
+591013	Life support in orbit and a way back: dogs first. Unlocks the Landing and Recovery Field.
+591014	Lunar Probes
+591015	The Blok E upper stage reaches escape velocity. Luna probes hit the Moon and photograph its far side.
+591016	Manned Spaceflight
+591017	The Vostok spacecraft and the cosmonaut corps. Unlocks the Cosmonaut Training Centre: graduates who train there become experts.
+591018	Glory to the Conquerors of Space
+591019	Monuments to the first man in space and to those who follow.
+591020	Storable Propellants
+591021	UDMH and nitrogen tetroxide ignite on contact and keep for months. Toxic and dangerous. Unlocks the Propellant Plant.
+591022	Extravehicular Activity
+591023	An inflatable airlock and a pressure suit that has to shrink back through it.
+591024	The Soyuz Spacecraft
+591025	Three cosmonauts, rendezvous and docking. Unlocks the Soyuz rocket.
+591026	Heavy Launcher (UR-500)
+591027	Chelomei's hypergolic heavy rocket. Unlocks the Proton for Zond and the lunar probes.
+591028	The N1 Moon Rocket
+591029	Thirty engines in the first stage, 105 m, 2750 t. Unlocks the Heavy Launch Complex. Without the NK-33 engines and a tested first stage it will fail.
+591030	NK-33 Engines and KORD
+591031	Kuznetsov's reusable engines and a control system that shuts down a failing engine and its opposite. Makes the N1 far more likely to survive its first stage.
+591032	Lunar Landing (L3)
+591033	The LK lander and the LOK orbiter. With these the N1 carries a cosmonaut to the Moon.

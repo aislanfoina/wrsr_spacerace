@@ -1,0 +1,1559 @@
+include("SOVIETInstructions.txt");
+
+defineVariable(int, i);
+defineVariable(int, j);
+defineVariable(int, k);
+defineVariable(int, n);
+defineVariable(int, r);
+defineVariable(int, day);
+defineVariable(int, year);
+defineVariable(int, winexist);
+defineVariable(int, bContinue);
+defineVariable(int, prestige);
+defineVariable(int, nVeh);
+defineVariable(int, nPad);
+defineVariable(int, nExperts);
+defineVariable(int, nTrack);
+defineVariable(int, nResearch);
+defineVariable(int, fi);
+defineVariable(int, fj);
+defineVariable(int, fk);
+defineVariable(int, fn);
+defineVariable(int, si);
+defineVariable(int, sn);
+defineVariable(int, ti);
+defineVariable(int, tn);
+defineVariable(int, ui);
+defineVariable(int, un);
+defineVariable(int, bi);
+defineVariable(int, bn);
+defineVariable(int, ci);
+defineVariable(int, cn);
+defineVariable(int, nFirsts);
+defineVariable(int, nSeconds);
+defineVariable(float, f);
+defineVariable(float, f2);
+defineVariable(float, fFail);
+defineVariable(float, fFuel);
+defineVariable(float, fLox);
+defineVariable(float, fCraft);
+defineVariable(float, fFood);
+defineVariable(float, fTake);
+defineVariable(float, fNeedFuel);
+defineVariable(float, fNeedLox);
+defineVariable(float, fNeedCraft);
+defineVariable(float, fNeedFood);
+defineVariable(float, fDist);
+defineVariable(float, fLoyal);
+defineVariable(float, fr);
+defineVariable(vec3, padPos);
+defineVariable(Building, bui);
+defineVariable(Vehicle, vehi);
+defineVariable(Person, wor);
+defineVariable(Resources, res);
+defineVariable(Resources, rtake);
+defineArray(int[8], srDone);
+defineArray(int[8], usDone);
+defineArray(int[6], rocketOK);
+
+defineFunction(CountExperts, int)
+{
+	fn = 0;
+	Script_SetUpdateFrequency(20000);
+	Person_GetNumberOfPeople(cn);
+	for (ci=0, ci<cn, ci=ci+1)
+	{
+		wor.GetDataByIndex(ci);
+		if (wor.nValidRead & wor.fEducation > 2.999)
+		{
+			fn = fn + 1;
+		}
+	}
+	Script_SetUpdateFrequency(5000);
+	return(fn);
+}
+
+defineFunction(CountTracking, int)
+{
+	fk = 0;
+	Building_GetNumberOfBuildings(bn);
+	for (bi=0, bi<bn, bi=bi+1)
+	{
+		bui.GetDataByIndex(bi);
+		if (bui.nValidRead & bui.nType ? BUILDINGTYPE_BROADCAST & bui.nProffesorsNeeded ? 30 & bui.nWorkersNeeded ? 40 & bui.fPercFinished > 0.9999)
+		{
+			fk = fk + 1;
+		}
+	}
+	return(fk);
+}
+
+defineFunction(FindRocket, int, float:fPowerWanted)
+{
+	fi = 0 - 1;
+	Vehicle_GetNumberOfVehicles(tn);
+	for (ti=0, ti<tn, ti=ti+1)
+	{
+		vehi.GetDataByIndex(ti);
+		if (vehi.nValidRead & vehi.nVehicleType ? VEHICLETYPE_HELICOPTER & vehi.fType_EnginePower > fPowerWanted - 0.5 & vehi.fType_EnginePower < fPowerWanted + 0.5)
+		{
+			fj = vehi.nBuilding_HomeWorkplaceID;
+			if (fj > -1)
+			{
+				bui.GetDataByIndex(fj);
+				if (bui.nValidRead & bui.nType ? BUILDINGTYPE_AIRPLANE_PARKING)
+				{
+					fDist = DistancePoints2D(vehi.vPosition, bui.vPosition);
+					if (fDist < 90.0)
+					{
+						fi = ti;
+						nPad = fj;
+						padPos = bui.vPosition;
+					}
+				}
+			}
+		}
+	}
+	return(fi);
+}
+
+defineFunction(SumNear, void)
+{
+	fFuel = 0;
+	fLox = 0;
+	fCraft = 0;
+	fFood = 0;
+	Script_SetUpdateFrequency(20000);
+	Building_GetNumberOfBuildings(sn);
+	for (si=0, si<sn, si=si+1)
+	{
+		bui.GetDataByIndex(si);
+		if (bui.nValidRead & bui.nStorageNum > 0)
+		{
+			fDist = DistancePoints2D(bui.vPosition, padPos);
+			if (fDist < 450.0)
+			{
+				res.ResetAmounts();
+				res.GetFromBuilding(si);
+				fFuel = fFuel + res.fuel;
+				fLox = fLox + res.chemicals;
+				fCraft = fCraft + res.eletronics;
+				fFood = fFood + res.food;
+			}
+		}
+	}
+	Script_SetUpdateFrequency(5000);
+	returnVoid();
+}
+
+defineFunction(TakeNear, void)
+{
+	Building_GetNumberOfBuildings(un);
+	for (ui=0, ui<un, ui=ui+1)
+	{
+		bui.GetDataByIndex(ui);
+		if (bui.nValidRead & bui.nStorageNum > 0)
+		{
+			fDist = DistancePoints2D(bui.vPosition, padPos);
+			if (fDist < 450.0)
+			{
+				res.ResetAmounts();
+				res.GetFromBuilding(ui);
+				rtake.ResetAmounts();
+				fTake = res.fuel;
+				if (fTake > fNeedFuel)
+				{
+					fTake = fNeedFuel;
+				}
+				if (fTake > 0)
+				{
+					rtake.fuel = 0 - fTake;
+					fNeedFuel = fNeedFuel - fTake;
+				}
+				fTake = res.chemicals;
+				if (fTake > fNeedLox)
+				{
+					fTake = fNeedLox;
+				}
+				if (fTake > 0)
+				{
+					rtake.chemicals = 0 - fTake;
+					fNeedLox = fNeedLox - fTake;
+				}
+				fTake = res.eletronics;
+				if (fTake > fNeedCraft)
+				{
+					fTake = fNeedCraft;
+				}
+				if (fTake > 0)
+				{
+					rtake.eletronics = 0 - fTake;
+					fNeedCraft = fNeedCraft - fTake;
+				}
+				fTake = res.food;
+				if (fTake > fNeedFood)
+				{
+					fTake = fNeedFood;
+				}
+				if (fTake > 0)
+				{
+					rtake.food = 0 - fTake;
+					fNeedFood = fNeedFood - fTake;
+				}
+				rtake.AddFromBuilding(ui);
+			}
+		}
+	}
+	returnVoid();
+}
+
+defineFunction(BoostLoyalty, void, float:fDelta)
+{
+	Script_SetUpdateFrequency(20000);
+	Person_GetNumberOfPeople(cn);
+	for (ci=0, ci<cn, ci=ci+1)
+	{
+		wor.GetDataByIndex(ci);
+		if (wor.nValidRead)
+		{
+			f2 = wor.fStatusSoviet + fDelta;
+			if (f2 > 1.0)
+			{
+				f2 = 1.0;
+			}
+			if (f2 < 0.0)
+			{
+				f2 = 0.0;
+			}
+			Person_SetStatus(ci, 3, f2);
+		}
+	}
+	Script_SetUpdateFrequency(5000);
+	returnVoid();
+}
+
+defineFunction(CheckUSA, void)
+{
+	Date_GetCurrentDate_D365Y(day, year);
+	if (!usDone[0] & (year > 1958 | (year ? 1958 & day > 30)))
+	{
+		usDone[0] = 1;
+		if (srDone[0])
+		{
+			Notification_CreateNewStringPic("United States", "Explorer 1 is in orbit. The Americans have their satellite. We were there first.", "research/sr_satellite.png", padPos);
+		}
+		else()
+		{
+			Notification_CreateNewStringPic("United States", "Explorer 1 is in orbit. The Americans have their satellite. The Americans got there first.", "research/sr_satellite.png", padPos);
+			prestige = prestige - 5;
+			nSeconds = nSeconds + 1;
+			fLoyal = 0.0 - 0.05;
+			BoostLoyalty(fLoyal);
+		}
+	}
+	if (!usDone[1] & (year > 1961 | (year ? 1961 & day > 30)))
+	{
+		usDone[1] = 1;
+		if (srDone[1])
+		{
+			Notification_CreateNewStringPic("United States", "Ham the chimpanzee has flown in an American capsule. We were there first.", "research/sr_biosatellite.png", padPos);
+		}
+		else()
+		{
+			Notification_CreateNewStringPic("United States", "Ham the chimpanzee has flown in an American capsule. The Americans got there first.", "research/sr_biosatellite.png", padPos);
+			prestige = prestige - 5;
+			nSeconds = nSeconds + 1;
+			fLoyal = 0.0 - 0.05;
+			BoostLoyalty(fLoyal);
+		}
+	}
+	if (!usDone[2] & (year > 1962 | (year ? 1962 & day > 115)))
+	{
+		usDone[2] = 1;
+		if (srDone[2])
+		{
+			Notification_CreateNewStringPic("United States", "Ranger 4 has struck the far side of the Moon. We were there first.", "research/sr_lunar_probes.png", padPos);
+		}
+		else()
+		{
+			Notification_CreateNewStringPic("United States", "Ranger 4 has struck the far side of the Moon. The Americans got there first.", "research/sr_lunar_probes.png", padPos);
+			prestige = prestige - 5;
+			nSeconds = nSeconds + 1;
+			fLoyal = 0.0 - 0.05;
+			BoostLoyalty(fLoyal);
+		}
+	}
+	if (!usDone[3] & (year > 1962 | (year ? 1962 & day > 50)))
+	{
+		usDone[3] = 1;
+		if (srDone[3])
+		{
+			Notification_CreateNewStringPic("United States", "John Glenn has orbited the Earth in Friendship 7. We were there first.", "research/sr_manned_flight.png", padPos);
+		}
+		else()
+		{
+			Notification_CreateNewStringPic("United States", "John Glenn has orbited the Earth in Friendship 7. The Americans got there first.", "research/sr_manned_flight.png", padPos);
+			prestige = prestige - 5;
+			nSeconds = nSeconds + 1;
+			fLoyal = 0.0 - 0.05;
+			BoostLoyalty(fLoyal);
+		}
+	}
+	if (!usDone[4] & (year > 1965 | (year ? 1965 & day > 153)))
+	{
+		usDone[4] = 1;
+		if (srDone[4])
+		{
+			Notification_CreateNewStringPic("United States", "Ed White has walked in space from Gemini 4. We were there first.", "research/sr_eva.png", padPos);
+		}
+		else()
+		{
+			Notification_CreateNewStringPic("United States", "Ed White has walked in space from Gemini 4. The Americans got there first.", "research/sr_eva.png", padPos);
+			prestige = prestige - 5;
+			nSeconds = nSeconds + 1;
+			fLoyal = 0.0 - 0.05;
+			BoostLoyalty(fLoyal);
+		}
+	}
+	if (!usDone[5] & (year > 1966 | (year ? 1966 & day > 74)))
+	{
+		usDone[5] = 1;
+		if (srDone[5])
+		{
+			Notification_CreateNewStringPic("United States", "Gemini 8 has docked with its Agena target. We were there first.", "research/sr_soyuz.png", padPos);
+		}
+		else()
+		{
+			Notification_CreateNewStringPic("United States", "Gemini 8 has docked with its Agena target. The Americans got there first.", "research/sr_soyuz.png", padPos);
+			prestige = prestige - 5;
+			nSeconds = nSeconds + 1;
+			fLoyal = 0.0 - 0.05;
+			BoostLoyalty(fLoyal);
+		}
+	}
+	if (!usDone[6] & (year > 1968 | (year ? 1968 & day > 355)))
+	{
+		usDone[6] = 1;
+		if (srDone[6])
+		{
+			Notification_CreateNewStringPic("United States", "Apollo 8 is in orbit around the Moon with three astronauts aboard. We were there first.", "research/sr_proton.png", padPos);
+		}
+		else()
+		{
+			Notification_CreateNewStringPic("United States", "Apollo 8 is in orbit around the Moon with three astronauts aboard. The Americans got there first.", "research/sr_proton.png", padPos);
+			prestige = prestige - 5;
+			nSeconds = nSeconds + 1;
+			fLoyal = 0.0 - 0.05;
+			BoostLoyalty(fLoyal);
+		}
+	}
+	if (!usDone[7] & (year > 1969 | (year ? 1969 & day > 200)))
+	{
+		usDone[7] = 1;
+		if (srDone[7])
+		{
+			Notification_CreateNewStringPic("United States", "Apollo 11 has landed on the Moon. Neil Armstrong walks on its surface. We were there first.", "research/sr_lunar_landing.png", padPos);
+		}
+		else()
+		{
+			Notification_CreateNewStringPic("United States", "Apollo 11 has landed on the Moon. Neil Armstrong walks on its surface. The Americans got there first.", "research/sr_lunar_landing.png", padPos);
+			prestige = prestige - 5;
+			nSeconds = nSeconds + 1;
+			fLoyal = 0.0 - 0.05;
+			BoostLoyalty(fLoyal);
+		}
+	}
+	returnVoid();
+}
+
+defineFunction(main, void)
+{
+	InitConstants();
+	prestige = 0;
+	nFirsts = 0;
+	nSeconds = 0;
+	for (i=0, i<8, i=i+1)
+	{
+		srDone[i] = 0;
+		usDone[i] = 0;
+	}
+	for (i=0, i<6, i=i+1)
+	{
+		rocketOK[i] = 0;
+	}
+	// wait quietly for the first space research - an ordinary republic never notices this script
+	nResearch = 0;
+	while (!nResearch)
+	{
+		Script_Sleep(30.0);
+		Research_IsCompleted("sr_rocketry", nResearch);
+		CheckUSA();
+	}
+	Scenario_WindowWithImageLeft("The Space Programme", "The Rocket Research Institute has opened. Korolev's designers promise a satellite before the Americans, then a man in space, then the Moon. Research the space branch, build the plants, the launch complexes and the cosmonaut corps. The Americans will not wait: they are racing towards Apollo 11 in July 1969.", "programme.png", 3);
+	winexist = 1;
+	while (winexist)
+	{
+		Scenario_WindowExists(winexist);
+	}
+	Scenario_ObjectiveCreate("sr_race", "The Space Race", "Reach every milestone before the United States. The last one: an N1 carrying cosmonauts to the Moon before 20 July 1969.");
+
+	// ---------------------------------------------------------------- sputnik
+	nResearch = 0;
+	while (!nResearch)
+	{
+		Script_Sleep(20.0);
+		Research_IsCompleted("sr_satellite", nResearch);
+		CheckUSA();
+	}
+	Scenario_WindowWithImageLeft("The first satellite", "Put an artificial satellite into orbit. Park an R-7 Sputnik rocket on a launch complex, store kerosene, liquid oxygen and the satellite in buildings within 450 m of the pad, and it will fly.", "sputnik.png", 3);
+	winexist = 1;
+	while (winexist)
+	{
+		Scenario_WindowExists(winexist);
+	}
+	Objectives_CreateNewString("sr_rocket", "R-7 Sputnik on a launch pad");
+	Objective_AddRequirement("sr_rocket", 1.0, "research/sr_satellite.png");
+	Objectives_CreateNewString("sr_prop", "Propellant near the pad (t)");
+	Objective_AddRequirement("sr_prop", 28.0, "resources/fuel.png");
+	Objectives_CreateNewString("sr_craft", "Payload near the pad (t)");
+	Objective_AddRequirement("sr_craft", 1.0, "resources/eletronics.png");
+	while (!srDone[0])
+	{
+		Script_Sleep(10.0);
+		CheckUSA();
+		bContinue = 1;
+		nVeh = FindRocket(9001.0);
+		if (nVeh > -1)
+		{
+			Objective_UpdateRequirement("sr_rocket", 0, 1.0);
+		}
+		else()
+		{
+			Objective_UpdateRequirement("sr_rocket", 0, 0.0);
+			bContinue = 0;
+		}
+		if (bContinue)
+		{
+			SumNear();
+			f = 0;
+			if (fFuel > 8.0)
+			{
+				f = f + 8.0;
+			}
+			else()
+			{
+				f = f + fFuel;
+				bContinue = 0;
+			}
+			if (fLox > 20.0)
+			{
+				f = f + 20.0;
+			}
+			else()
+			{
+				f = f + fLox;
+				bContinue = 0;
+			}
+			Objective_UpdateRequirement("sr_prop", 0, f);
+			f = fCraft;
+			if (f > 1.0)
+			{
+				f = 1.0;
+			}
+			Objective_UpdateRequirement("sr_craft", 0, f);
+			if (fCraft < 1.0)
+			{
+				bContinue = 0;
+			}
+		}
+		if (bContinue)
+		{
+			// launch: the goods are spent whatever happens
+			fNeedFuel = 8.0;
+			fNeedLox = 20.0;
+			fNeedCraft = 1.0;
+			fNeedFood = 0.0;
+			TakeNear();
+			Scenario_ObjectiveMoveCameraTo(padPos, 260.0);
+			Notification_CreateNewStringPic("Launch", "R-7 Sputnik ignition... lift-off!", "research/sr_satellite.png", padPos);
+			Script_Sleep(4.0);
+			fFail = 30 - 5 * rocketOK[0];
+			if (fFail < 5)
+			{
+				fFail = 5;
+			}
+			Random(r);
+			r = r % 100;
+			fr = r;
+			Vehicle_Sell(nVeh, 0, 0);
+			if (fr < fFail)
+			{
+				Building_StartFire(nPad);
+				prestige = prestige - 2;
+				Notification_CreateNewStringPic("Launch failure", "The R-7 Sputnik exploded. The pad is burning. Build another rocket and try again.", "research/sr_satellite.png", padPos);
+			}
+			else()
+			{
+				srDone[0] = 1;
+				rocketOK[0] = rocketOK[0] + 1;
+				if (usDone[0])
+				{
+					prestige = prestige + 3;
+					Money_AddUSD(5000);
+					fLoyal = 0.03;
+					BoostLoyalty(fLoyal);
+					Scenario_WindowWithImageLeft("The first satellite", "Beep... beep... beep. Sputnik is in orbit and every radio on Earth can hear it. The space age has begun, and it began here. The Americans did it first, but we are catching up.", "sputnik.png", 3);
+				}
+				else()
+				{
+					prestige = prestige + 10;
+					nFirsts = nFirsts + 1;
+					Money_AddUSD(25000);
+					fLoyal = 0.12;
+					BoostLoyalty(fLoyal);
+					Scenario_WindowWithImageLeft("The first satellite", "Beep... beep... beep. Sputnik is in orbit and every radio on Earth can hear it. The space age has begun, and it began here. A Soviet first: the world is watching.", "sputnik.png", 3);
+				}
+				winexist = 1;
+				while (winexist)
+				{
+					Scenario_WindowExists(winexist);
+				}
+			}
+		}
+	}
+	Objective_Remove("sr_rocket");
+	Objective_Remove("sr_prop");
+	Objective_Remove("sr_craft");
+
+	// ---------------------------------------------------------------- laika
+	nResearch = 0;
+	while (!nResearch)
+	{
+		Script_Sleep(20.0);
+		Research_IsCompleted("sr_biosatellite", nResearch);
+		CheckUSA();
+	}
+	Scenario_WindowWithImageLeft("A passenger in orbit", "Send a living passenger into orbit: a satellite with life support and food for the flight. Belka and Strelka came back; Laika did not.", "laika.png", 3);
+	winexist = 1;
+	while (winexist)
+	{
+		Scenario_WindowExists(winexist);
+	}
+	Objectives_CreateNewString("sr_rocket", "R-7 Sputnik on a launch pad");
+	Objective_AddRequirement("sr_rocket", 1.0, "research/sr_biosatellite.png");
+	Objectives_CreateNewString("sr_prop", "Propellant near the pad (t)");
+	Objective_AddRequirement("sr_prop", 28.0, "resources/fuel.png");
+	Objectives_CreateNewString("sr_craft", "Payload near the pad (t)");
+	Objective_AddRequirement("sr_craft", 2.0, "resources/eletronics.png");
+	while (!srDone[1])
+	{
+		Script_Sleep(10.0);
+		CheckUSA();
+		bContinue = 1;
+		nVeh = FindRocket(9001.0);
+		if (nVeh > -1)
+		{
+			Objective_UpdateRequirement("sr_rocket", 0, 1.0);
+		}
+		else()
+		{
+			Objective_UpdateRequirement("sr_rocket", 0, 0.0);
+			bContinue = 0;
+		}
+		if (bContinue)
+		{
+			SumNear();
+			f = 0;
+			if (fFuel > 8.0)
+			{
+				f = f + 8.0;
+			}
+			else()
+			{
+				f = f + fFuel;
+				bContinue = 0;
+			}
+			if (fLox > 20.0)
+			{
+				f = f + 20.0;
+			}
+			else()
+			{
+				f = f + fLox;
+				bContinue = 0;
+			}
+			Objective_UpdateRequirement("sr_prop", 0, f);
+			f = fCraft;
+			if (f > 2.0)
+			{
+				f = 2.0;
+			}
+			Objective_UpdateRequirement("sr_craft", 0, f);
+			if (fCraft < 2.0)
+			{
+				bContinue = 0;
+			}
+			if (fFood < 1.0)
+			{
+				bContinue = 0;
+			}
+		}
+		if (bContinue)
+		{
+			// launch: the goods are spent whatever happens
+			fNeedFuel = 8.0;
+			fNeedLox = 20.0;
+			fNeedCraft = 2.0;
+			fNeedFood = 1.0;
+			TakeNear();
+			Scenario_ObjectiveMoveCameraTo(padPos, 260.0);
+			Notification_CreateNewStringPic("Launch", "R-7 Sputnik ignition... lift-off!", "research/sr_biosatellite.png", padPos);
+			Script_Sleep(4.0);
+			fFail = 25 - 5 * rocketOK[0];
+			if (fFail < 5)
+			{
+				fFail = 5;
+			}
+			Random(r);
+			r = r % 100;
+			fr = r;
+			Vehicle_Sell(nVeh, 0, 0);
+			if (fr < fFail)
+			{
+				Building_StartFire(nPad);
+				prestige = prestige - 2;
+				Notification_CreateNewStringPic("Launch failure", "The R-7 Sputnik exploded. The pad is burning. Build another rocket and try again.", "research/sr_biosatellite.png", padPos);
+			}
+			else()
+			{
+				srDone[1] = 1;
+				rocketOK[0] = rocketOK[0] + 1;
+				if (usDone[1])
+				{
+					prestige = prestige + 3;
+					Money_AddUSD(5000);
+					fLoyal = 0.03;
+					BoostLoyalty(fLoyal);
+					Scenario_WindowWithImageLeft("A passenger in orbit", "A living creature has orbited the Earth. Now we know a cosmonaut can survive up there. The Americans did it first, but we are catching up.", "laika.png", 3);
+				}
+				else()
+				{
+					prestige = prestige + 10;
+					nFirsts = nFirsts + 1;
+					Money_AddUSD(25000);
+					fLoyal = 0.12;
+					BoostLoyalty(fLoyal);
+					Scenario_WindowWithImageLeft("A passenger in orbit", "A living creature has orbited the Earth. Now we know a cosmonaut can survive up there. A Soviet first: the world is watching.", "laika.png", 3);
+				}
+				winexist = 1;
+				while (winexist)
+				{
+					Scenario_WindowExists(winexist);
+				}
+			}
+		}
+	}
+	Objective_Remove("sr_rocket");
+	Objective_Remove("sr_prop");
+	Objective_Remove("sr_craft");
+
+	// ---------------------------------------------------------------- luna
+	nResearch = 0;
+	while (!nResearch)
+	{
+		Script_Sleep(20.0);
+		Research_IsCompleted("sr_lunar_probes", nResearch);
+		CheckUSA();
+	}
+	Scenario_WindowWithImageLeft("To the Moon", "Hit the Moon with a Luna probe. The Vostok-K and its Blok E upper stage can reach escape velocity; a tracking station must follow it.", "luna.png", 3);
+	winexist = 1;
+	while (winexist)
+	{
+		Scenario_WindowExists(winexist);
+	}
+	Objectives_CreateNewString("sr_rocket", "Vostok-K on a launch pad");
+	Objective_AddRequirement("sr_rocket", 1.0, "research/sr_lunar_probes.png");
+	Objectives_CreateNewString("sr_prop", "Propellant near the pad (t)");
+	Objective_AddRequirement("sr_prop", 35.0, "resources/fuel.png");
+	Objectives_CreateNewString("sr_craft", "Payload near the pad (t)");
+	Objective_AddRequirement("sr_craft", 2.0, "resources/eletronics.png");
+	Objectives_CreateNewString("sr_track", "Tracking stations");
+	Objective_AddRequirement("sr_track", 1.0, "research/sr_satellite.png");
+	while (!srDone[2])
+	{
+		Script_Sleep(10.0);
+		CheckUSA();
+		bContinue = 1;
+		nVeh = FindRocket(9002.0);
+		if (nVeh > -1)
+		{
+			Objective_UpdateRequirement("sr_rocket", 0, 1.0);
+		}
+		else()
+		{
+			Objective_UpdateRequirement("sr_rocket", 0, 0.0);
+			bContinue = 0;
+		}
+		if (bContinue)
+		{
+			SumNear();
+			f = 0;
+			if (fFuel > 10.0)
+			{
+				f = f + 10.0;
+			}
+			else()
+			{
+				f = f + fFuel;
+				bContinue = 0;
+			}
+			if (fLox > 25.0)
+			{
+				f = f + 25.0;
+			}
+			else()
+			{
+				f = f + fLox;
+				bContinue = 0;
+			}
+			Objective_UpdateRequirement("sr_prop", 0, f);
+			f = fCraft;
+			if (f > 2.0)
+			{
+				f = 2.0;
+			}
+			Objective_UpdateRequirement("sr_craft", 0, f);
+			if (fCraft < 2.0)
+			{
+				bContinue = 0;
+			}
+		}
+		nTrack = CountTracking();
+		f = nTrack;
+		Objective_UpdateRequirement("sr_track", 0, f);
+		if (nTrack < 1)
+		{
+			bContinue = 0;
+		}
+		if (bContinue)
+		{
+			// launch: the goods are spent whatever happens
+			fNeedFuel = 10.0;
+			fNeedLox = 25.0;
+			fNeedCraft = 2.0;
+			fNeedFood = 0.0;
+			TakeNear();
+			Scenario_ObjectiveMoveCameraTo(padPos, 260.0);
+			Notification_CreateNewStringPic("Launch", "Vostok-K ignition... lift-off!", "research/sr_lunar_probes.png", padPos);
+			Script_Sleep(4.0);
+			fFail = 35 - 5 * rocketOK[1];
+			if (fFail < 5)
+			{
+				fFail = 5;
+			}
+			Random(r);
+			r = r % 100;
+			fr = r;
+			Vehicle_Sell(nVeh, 0, 0);
+			if (fr < fFail)
+			{
+				Building_StartFire(nPad);
+				prestige = prestige - 2;
+				Notification_CreateNewStringPic("Launch failure", "The Vostok-K exploded. The pad is burning. Build another rocket and try again.", "research/sr_lunar_probes.png", padPos);
+			}
+			else()
+			{
+				srDone[2] = 1;
+				rocketOK[1] = rocketOK[1] + 1;
+				if (usDone[2])
+				{
+					prestige = prestige + 3;
+					Money_AddUSD(5000);
+					fLoyal = 0.03;
+					BoostLoyalty(fLoyal);
+					Scenario_WindowWithImageLeft("To the Moon", "Luna has reached the Moon and left the pennant of the Soviet Union on its surface. The Americans did it first, but we are catching up.", "luna.png", 3);
+				}
+				else()
+				{
+					prestige = prestige + 10;
+					nFirsts = nFirsts + 1;
+					Money_AddUSD(25000);
+					fLoyal = 0.12;
+					BoostLoyalty(fLoyal);
+					Scenario_WindowWithImageLeft("To the Moon", "Luna has reached the Moon and left the pennant of the Soviet Union on its surface. A Soviet first: the world is watching.", "luna.png", 3);
+				}
+				winexist = 1;
+				while (winexist)
+				{
+					Scenario_WindowExists(winexist);
+				}
+			}
+		}
+	}
+	Objective_Remove("sr_rocket");
+	Objective_Remove("sr_prop");
+	Objective_Remove("sr_craft");
+	Objective_Remove("sr_track");
+
+	// ---------------------------------------------------------------- vostok
+	nResearch = 0;
+	while (!nResearch)
+	{
+		Script_Sleep(20.0);
+		Research_IsCompleted("sr_manned_flight", nResearch);
+		CheckUSA();
+	}
+	Scenario_WindowWithImageLeft("The first man in space", "Put a cosmonaut into orbit and bring him back. You need a Vostok-K on the pad, the Vostok spacecraft, a trained cosmonaut (an expert from the Cosmonaut Training Centre) and a tracking station.", "vostok.png", 3);
+	winexist = 1;
+	while (winexist)
+	{
+		Scenario_WindowExists(winexist);
+	}
+	Objectives_CreateNewString("sr_rocket", "Vostok-K on a launch pad");
+	Objective_AddRequirement("sr_rocket", 1.0, "research/sr_manned_flight.png");
+	Objectives_CreateNewString("sr_prop", "Propellant near the pad (t)");
+	Objective_AddRequirement("sr_prop", 35.0, "resources/fuel.png");
+	Objectives_CreateNewString("sr_craft", "Payload near the pad (t)");
+	Objective_AddRequirement("sr_craft", 5.0, "resources/eletronics.png");
+	Objectives_CreateNewString("sr_crew", "Cosmonauts (experts)");
+	Objective_AddRequirement("sr_crew", 1.0, "research/sr_manned_flight.png");
+	Objectives_CreateNewString("sr_track", "Tracking stations");
+	Objective_AddRequirement("sr_track", 1.0, "research/sr_satellite.png");
+	while (!srDone[3])
+	{
+		Script_Sleep(10.0);
+		CheckUSA();
+		bContinue = 1;
+		nVeh = FindRocket(9002.0);
+		if (nVeh > -1)
+		{
+			Objective_UpdateRequirement("sr_rocket", 0, 1.0);
+		}
+		else()
+		{
+			Objective_UpdateRequirement("sr_rocket", 0, 0.0);
+			bContinue = 0;
+		}
+		if (bContinue)
+		{
+			SumNear();
+			f = 0;
+			if (fFuel > 10.0)
+			{
+				f = f + 10.0;
+			}
+			else()
+			{
+				f = f + fFuel;
+				bContinue = 0;
+			}
+			if (fLox > 25.0)
+			{
+				f = f + 25.0;
+			}
+			else()
+			{
+				f = f + fLox;
+				bContinue = 0;
+			}
+			Objective_UpdateRequirement("sr_prop", 0, f);
+			f = fCraft;
+			if (f > 5.0)
+			{
+				f = 5.0;
+			}
+			Objective_UpdateRequirement("sr_craft", 0, f);
+			if (fCraft < 5.0)
+			{
+				bContinue = 0;
+			}
+			if (fFood < 1.0)
+			{
+				bContinue = 0;
+			}
+		}
+		nExperts = CountExperts();
+		f = nExperts;
+		Objective_UpdateRequirement("sr_crew", 0, f);
+		if (nExperts < 1)
+		{
+			bContinue = 0;
+		}
+		nTrack = CountTracking();
+		f = nTrack;
+		Objective_UpdateRequirement("sr_track", 0, f);
+		if (nTrack < 1)
+		{
+			bContinue = 0;
+		}
+		if (bContinue)
+		{
+			// launch: the goods are spent whatever happens
+			fNeedFuel = 10.0;
+			fNeedLox = 25.0;
+			fNeedCraft = 5.0;
+			fNeedFood = 1.0;
+			TakeNear();
+			Scenario_ObjectiveMoveCameraTo(padPos, 260.0);
+			Notification_CreateNewStringPic("Launch", "Vostok-K ignition... lift-off!", "research/sr_manned_flight.png", padPos);
+			Script_Sleep(4.0);
+			fFail = 15 - 5 * rocketOK[1];
+			if (fFail < 5)
+			{
+				fFail = 5;
+			}
+			Random(r);
+			r = r % 100;
+			fr = r;
+			Vehicle_Sell(nVeh, 0, 0);
+			if (fr < fFail)
+			{
+				Building_StartFire(nPad);
+				prestige = prestige - 2;
+				Notification_CreateNewStringPic("Launch failure", "The Vostok-K exploded. The pad is burning. Build another rocket and try again.", "research/sr_manned_flight.png", padPos);
+			}
+			else()
+			{
+				srDone[3] = 1;
+				rocketOK[1] = rocketOK[1] + 1;
+				if (usDone[3])
+				{
+					prestige = prestige + 3;
+					Money_AddUSD(5000);
+					fLoyal = 0.03;
+					BoostLoyalty(fLoyal);
+					Scenario_WindowWithImageLeft("The first man in space", "Poyekhali! A Soviet cosmonaut has orbited the Earth and landed safely in the steppe. The whole world knows his name. The Americans did it first, but we are catching up.", "vostok.png", 3);
+				}
+				else()
+				{
+					prestige = prestige + 10;
+					nFirsts = nFirsts + 1;
+					Money_AddUSD(25000);
+					fLoyal = 0.12;
+					BoostLoyalty(fLoyal);
+					Scenario_WindowWithImageLeft("The first man in space", "Poyekhali! A Soviet cosmonaut has orbited the Earth and landed safely in the steppe. The whole world knows his name. A Soviet first: the world is watching.", "vostok.png", 3);
+				}
+				winexist = 1;
+				while (winexist)
+				{
+					Scenario_WindowExists(winexist);
+				}
+			}
+		}
+	}
+	Objective_Remove("sr_rocket");
+	Objective_Remove("sr_prop");
+	Objective_Remove("sr_craft");
+	Objective_Remove("sr_crew");
+	Objective_Remove("sr_track");
+
+	// ---------------------------------------------------------------- voskhod
+	nResearch = 0;
+	while (!nResearch)
+	{
+		Script_Sleep(20.0);
+		Research_IsCompleted("sr_eva", nResearch);
+		CheckUSA();
+	}
+	Scenario_WindowWithImageLeft("A walk in space", "Two cosmonauts, an inflatable airlock and the first walk outside a spacecraft.", "voskhod.png", 3);
+	winexist = 1;
+	while (winexist)
+	{
+		Scenario_WindowExists(winexist);
+	}
+	Objectives_CreateNewString("sr_rocket", "Soyuz on a launch pad");
+	Objective_AddRequirement("sr_rocket", 1.0, "research/sr_eva.png");
+	Objectives_CreateNewString("sr_prop", "Propellant near the pad (t)");
+	Objective_AddRequirement("sr_prop", 42.0, "resources/fuel.png");
+	Objectives_CreateNewString("sr_craft", "Payload near the pad (t)");
+	Objective_AddRequirement("sr_craft", 6.0, "resources/eletronics.png");
+	Objectives_CreateNewString("sr_crew", "Cosmonauts (experts)");
+	Objective_AddRequirement("sr_crew", 2.0, "research/sr_manned_flight.png");
+	Objectives_CreateNewString("sr_track", "Tracking stations");
+	Objective_AddRequirement("sr_track", 1.0, "research/sr_satellite.png");
+	while (!srDone[4])
+	{
+		Script_Sleep(10.0);
+		CheckUSA();
+		bContinue = 1;
+		nVeh = FindRocket(9003.0);
+		if (nVeh > -1)
+		{
+			Objective_UpdateRequirement("sr_rocket", 0, 1.0);
+		}
+		else()
+		{
+			Objective_UpdateRequirement("sr_rocket", 0, 0.0);
+			bContinue = 0;
+		}
+		if (bContinue)
+		{
+			SumNear();
+			f = 0;
+			if (fFuel > 12.0)
+			{
+				f = f + 12.0;
+			}
+			else()
+			{
+				f = f + fFuel;
+				bContinue = 0;
+			}
+			if (fLox > 30.0)
+			{
+				f = f + 30.0;
+			}
+			else()
+			{
+				f = f + fLox;
+				bContinue = 0;
+			}
+			Objective_UpdateRequirement("sr_prop", 0, f);
+			f = fCraft;
+			if (f > 6.0)
+			{
+				f = 6.0;
+			}
+			Objective_UpdateRequirement("sr_craft", 0, f);
+			if (fCraft < 6.0)
+			{
+				bContinue = 0;
+			}
+			if (fFood < 1.0)
+			{
+				bContinue = 0;
+			}
+		}
+		nExperts = CountExperts();
+		f = nExperts;
+		Objective_UpdateRequirement("sr_crew", 0, f);
+		if (nExperts < 2)
+		{
+			bContinue = 0;
+		}
+		nTrack = CountTracking();
+		f = nTrack;
+		Objective_UpdateRequirement("sr_track", 0, f);
+		if (nTrack < 1)
+		{
+			bContinue = 0;
+		}
+		if (bContinue)
+		{
+			// launch: the goods are spent whatever happens
+			fNeedFuel = 12.0;
+			fNeedLox = 30.0;
+			fNeedCraft = 6.0;
+			fNeedFood = 1.0;
+			TakeNear();
+			Scenario_ObjectiveMoveCameraTo(padPos, 260.0);
+			Notification_CreateNewStringPic("Launch", "Soyuz ignition... lift-off!", "research/sr_eva.png", padPos);
+			Script_Sleep(4.0);
+			fFail = 15 - 5 * rocketOK[2];
+			if (fFail < 5)
+			{
+				fFail = 5;
+			}
+			Random(r);
+			r = r % 100;
+			fr = r;
+			Vehicle_Sell(nVeh, 0, 0);
+			if (fr < fFail)
+			{
+				Building_StartFire(nPad);
+				prestige = prestige - 2;
+				Notification_CreateNewStringPic("Launch failure", "The Soyuz exploded. The pad is burning. Build another rocket and try again.", "research/sr_eva.png", padPos);
+			}
+			else()
+			{
+				srDone[4] = 1;
+				rocketOK[2] = rocketOK[2] + 1;
+				if (usDone[4])
+				{
+					prestige = prestige + 3;
+					Money_AddUSD(5000);
+					fLoyal = 0.03;
+					BoostLoyalty(fLoyal);
+					Scenario_WindowWithImageLeft("A walk in space", "A cosmonaut has floated outside his ship for twelve minutes, and got back in. The Americans did it first, but we are catching up.", "voskhod.png", 3);
+				}
+				else()
+				{
+					prestige = prestige + 10;
+					nFirsts = nFirsts + 1;
+					Money_AddUSD(25000);
+					fLoyal = 0.12;
+					BoostLoyalty(fLoyal);
+					Scenario_WindowWithImageLeft("A walk in space", "A cosmonaut has floated outside his ship for twelve minutes, and got back in. A Soviet first: the world is watching.", "voskhod.png", 3);
+				}
+				winexist = 1;
+				while (winexist)
+				{
+					Scenario_WindowExists(winexist);
+				}
+			}
+		}
+	}
+	Objective_Remove("sr_rocket");
+	Objective_Remove("sr_prop");
+	Objective_Remove("sr_craft");
+	Objective_Remove("sr_crew");
+	Objective_Remove("sr_track");
+
+	// ---------------------------------------------------------------- soyuz
+	nResearch = 0;
+	while (!nResearch)
+	{
+		Script_Sleep(20.0);
+		Research_IsCompleted("sr_soyuz", nResearch);
+		CheckUSA();
+	}
+	Scenario_WindowWithImageLeft("Rendezvous and docking", "The Soyuz: three cosmonauts, rendezvous and docking in orbit - everything a Moon flight needs. Two tracking stations must follow it.", "soyuz.png", 3);
+	winexist = 1;
+	while (winexist)
+	{
+		Scenario_WindowExists(winexist);
+	}
+	Objectives_CreateNewString("sr_rocket", "Soyuz on a launch pad");
+	Objective_AddRequirement("sr_rocket", 1.0, "research/sr_soyuz.png");
+	Objectives_CreateNewString("sr_prop", "Propellant near the pad (t)");
+	Objective_AddRequirement("sr_prop", 42.0, "resources/fuel.png");
+	Objectives_CreateNewString("sr_craft", "Payload near the pad (t)");
+	Objective_AddRequirement("sr_craft", 7.0, "resources/eletronics.png");
+	Objectives_CreateNewString("sr_crew", "Cosmonauts (experts)");
+	Objective_AddRequirement("sr_crew", 3.0, "research/sr_manned_flight.png");
+	Objectives_CreateNewString("sr_track", "Tracking stations");
+	Objective_AddRequirement("sr_track", 2.0, "research/sr_satellite.png");
+	while (!srDone[5])
+	{
+		Script_Sleep(10.0);
+		CheckUSA();
+		bContinue = 1;
+		nVeh = FindRocket(9003.0);
+		if (nVeh > -1)
+		{
+			Objective_UpdateRequirement("sr_rocket", 0, 1.0);
+		}
+		else()
+		{
+			Objective_UpdateRequirement("sr_rocket", 0, 0.0);
+			bContinue = 0;
+		}
+		if (bContinue)
+		{
+			SumNear();
+			f = 0;
+			if (fFuel > 12.0)
+			{
+				f = f + 12.0;
+			}
+			else()
+			{
+				f = f + fFuel;
+				bContinue = 0;
+			}
+			if (fLox > 30.0)
+			{
+				f = f + 30.0;
+			}
+			else()
+			{
+				f = f + fLox;
+				bContinue = 0;
+			}
+			Objective_UpdateRequirement("sr_prop", 0, f);
+			f = fCraft;
+			if (f > 7.0)
+			{
+				f = 7.0;
+			}
+			Objective_UpdateRequirement("sr_craft", 0, f);
+			if (fCraft < 7.0)
+			{
+				bContinue = 0;
+			}
+			if (fFood < 2.0)
+			{
+				bContinue = 0;
+			}
+		}
+		nExperts = CountExperts();
+		f = nExperts;
+		Objective_UpdateRequirement("sr_crew", 0, f);
+		if (nExperts < 3)
+		{
+			bContinue = 0;
+		}
+		nTrack = CountTracking();
+		f = nTrack;
+		Objective_UpdateRequirement("sr_track", 0, f);
+		if (nTrack < 2)
+		{
+			bContinue = 0;
+		}
+		if (bContinue)
+		{
+			// launch: the goods are spent whatever happens
+			fNeedFuel = 12.0;
+			fNeedLox = 30.0;
+			fNeedCraft = 7.0;
+			fNeedFood = 2.0;
+			TakeNear();
+			Scenario_ObjectiveMoveCameraTo(padPos, 260.0);
+			Notification_CreateNewStringPic("Launch", "Soyuz ignition... lift-off!", "research/sr_soyuz.png", padPos);
+			Script_Sleep(4.0);
+			fFail = 15 - 5 * rocketOK[2];
+			if (fFail < 5)
+			{
+				fFail = 5;
+			}
+			Random(r);
+			r = r % 100;
+			fr = r;
+			Vehicle_Sell(nVeh, 0, 0);
+			if (fr < fFail)
+			{
+				Building_StartFire(nPad);
+				prestige = prestige - 2;
+				Notification_CreateNewStringPic("Launch failure", "The Soyuz exploded. The pad is burning. Build another rocket and try again.", "research/sr_soyuz.png", padPos);
+			}
+			else()
+			{
+				srDone[5] = 1;
+				rocketOK[2] = rocketOK[2] + 1;
+				if (usDone[5])
+				{
+					prestige = prestige + 3;
+					Money_AddUSD(5000);
+					fLoyal = 0.03;
+					BoostLoyalty(fLoyal);
+					Scenario_WindowWithImageLeft("Rendezvous and docking", "Two ships have met and docked in orbit. The road to the Moon is open. The Americans did it first, but we are catching up.", "soyuz.png", 3);
+				}
+				else()
+				{
+					prestige = prestige + 10;
+					nFirsts = nFirsts + 1;
+					Money_AddUSD(25000);
+					fLoyal = 0.12;
+					BoostLoyalty(fLoyal);
+					Scenario_WindowWithImageLeft("Rendezvous and docking", "Two ships have met and docked in orbit. The road to the Moon is open. A Soviet first: the world is watching.", "soyuz.png", 3);
+				}
+				winexist = 1;
+				while (winexist)
+				{
+					Scenario_WindowExists(winexist);
+				}
+			}
+		}
+	}
+	Objective_Remove("sr_rocket");
+	Objective_Remove("sr_prop");
+	Objective_Remove("sr_craft");
+	Objective_Remove("sr_crew");
+	Objective_Remove("sr_track");
+
+	// ---------------------------------------------------------------- zond
+	nResearch = 0;
+	while (!nResearch)
+	{
+		Script_Sleep(20.0);
+		Research_IsCompleted("sr_proton", nResearch);
+		CheckUSA();
+	}
+	Scenario_WindowWithImageLeft("Around the Moon", "Send a Zond spacecraft around the Moon and back on the Proton. It burns storable propellants (counted as chemicals here).", "zond.png", 3);
+	winexist = 1;
+	while (winexist)
+	{
+		Scenario_WindowExists(winexist);
+	}
+	Objectives_CreateNewString("sr_rocket", "Proton on a launch pad");
+	Objective_AddRequirement("sr_rocket", 1.0, "research/sr_proton.png");
+	Objectives_CreateNewString("sr_prop", "Propellant near the pad (t)");
+	Objective_AddRequirement("sr_prop", 60.0, "resources/fuel.png");
+	Objectives_CreateNewString("sr_craft", "Payload near the pad (t)");
+	Objective_AddRequirement("sr_craft", 8.0, "resources/eletronics.png");
+	Objectives_CreateNewString("sr_track", "Tracking stations");
+	Objective_AddRequirement("sr_track", 2.0, "research/sr_satellite.png");
+	while (!srDone[6])
+	{
+		Script_Sleep(10.0);
+		CheckUSA();
+		bContinue = 1;
+		nVeh = FindRocket(9004.0);
+		if (nVeh > -1)
+		{
+			Objective_UpdateRequirement("sr_rocket", 0, 1.0);
+		}
+		else()
+		{
+			Objective_UpdateRequirement("sr_rocket", 0, 0.0);
+			bContinue = 0;
+		}
+		if (bContinue)
+		{
+			SumNear();
+			f = 0;
+			if (fLox > 60.0)
+			{
+				f = f + 60.0;
+			}
+			else()
+			{
+				f = f + fLox;
+				bContinue = 0;
+			}
+			Objective_UpdateRequirement("sr_prop", 0, f);
+			f = fCraft;
+			if (f > 8.0)
+			{
+				f = 8.0;
+			}
+			Objective_UpdateRequirement("sr_craft", 0, f);
+			if (fCraft < 8.0)
+			{
+				bContinue = 0;
+			}
+		}
+		nTrack = CountTracking();
+		f = nTrack;
+		Objective_UpdateRequirement("sr_track", 0, f);
+		if (nTrack < 2)
+		{
+			bContinue = 0;
+		}
+		if (bContinue)
+		{
+			// launch: the goods are spent whatever happens
+			fNeedFuel = 0.0;
+			fNeedLox = 60.0;
+			fNeedCraft = 8.0;
+			fNeedFood = 0.0;
+			TakeNear();
+			Scenario_ObjectiveMoveCameraTo(padPos, 260.0);
+			Notification_CreateNewStringPic("Launch", "Proton ignition... lift-off!", "research/sr_proton.png", padPos);
+			Script_Sleep(4.0);
+			fFail = 35 - 5 * rocketOK[3];
+			if (fFail < 5)
+			{
+				fFail = 5;
+			}
+			Random(r);
+			r = r % 100;
+			fr = r;
+			Vehicle_Sell(nVeh, 0, 0);
+			if (fr < fFail)
+			{
+				Building_StartFire(nPad);
+				prestige = prestige - 2;
+				Notification_CreateNewStringPic("Launch failure", "The Proton exploded. The pad is burning. Build another rocket and try again.", "research/sr_proton.png", padPos);
+			}
+			else()
+			{
+				srDone[6] = 1;
+				rocketOK[3] = rocketOK[3] + 1;
+				if (usDone[6])
+				{
+					prestige = prestige + 3;
+					Money_AddUSD(5000);
+					fLoyal = 0.03;
+					BoostLoyalty(fLoyal);
+					Scenario_WindowWithImageLeft("Around the Moon", "Zond has flown round the Moon and splashed down with its tortoises alive. The Americans did it first, but we are catching up.", "zond.png", 3);
+				}
+				else()
+				{
+					prestige = prestige + 10;
+					nFirsts = nFirsts + 1;
+					Money_AddUSD(25000);
+					fLoyal = 0.12;
+					BoostLoyalty(fLoyal);
+					Scenario_WindowWithImageLeft("Around the Moon", "Zond has flown round the Moon and splashed down with its tortoises alive. A Soviet first: the world is watching.", "zond.png", 3);
+				}
+				winexist = 1;
+				while (winexist)
+				{
+					Scenario_WindowExists(winexist);
+				}
+			}
+		}
+	}
+	Objective_Remove("sr_rocket");
+	Objective_Remove("sr_prop");
+	Objective_Remove("sr_craft");
+	Objective_Remove("sr_track");
+
+	// ---------------------------------------------------------------- moon
+	nResearch = 0;
+	while (!nResearch)
+	{
+		Script_Sleep(20.0);
+		Research_IsCompleted("sr_lunar_landing", nResearch);
+		CheckUSA();
+	}
+	Scenario_WindowWithImageLeft("A Soviet footprint on the Moon", "The N1 has to fly. Park it on the Heavy Launch Complex with 80 t of kerosene, 200 t of liquid oxygen and 25 t of spacecraft in reach, two cosmonauts and three tracking stations. Without the NK-33 engines most N1s explode.", "moon.png", 3);
+	winexist = 1;
+	while (winexist)
+	{
+		Scenario_WindowExists(winexist);
+	}
+	Objectives_CreateNewString("sr_rocket", "N1-L3 on a launch pad");
+	Objective_AddRequirement("sr_rocket", 1.0, "research/sr_lunar_landing.png");
+	Objectives_CreateNewString("sr_prop", "Propellant near the pad (t)");
+	Objective_AddRequirement("sr_prop", 280.0, "resources/fuel.png");
+	Objectives_CreateNewString("sr_craft", "Payload near the pad (t)");
+	Objective_AddRequirement("sr_craft", 25.0, "resources/eletronics.png");
+	Objectives_CreateNewString("sr_crew", "Cosmonauts (experts)");
+	Objective_AddRequirement("sr_crew", 2.0, "research/sr_manned_flight.png");
+	Objectives_CreateNewString("sr_track", "Tracking stations");
+	Objective_AddRequirement("sr_track", 3.0, "research/sr_satellite.png");
+	while (!srDone[7])
+	{
+		Script_Sleep(10.0);
+		CheckUSA();
+		bContinue = 1;
+		nVeh = FindRocket(9005.0);
+		if (nVeh > -1)
+		{
+			Objective_UpdateRequirement("sr_rocket", 0, 1.0);
+		}
+		else()
+		{
+			Objective_UpdateRequirement("sr_rocket", 0, 0.0);
+			bContinue = 0;
+		}
+		if (bContinue)
+		{
+			SumNear();
+			f = 0;
+			if (fFuel > 80.0)
+			{
+				f = f + 80.0;
+			}
+			else()
+			{
+				f = f + fFuel;
+				bContinue = 0;
+			}
+			if (fLox > 200.0)
+			{
+				f = f + 200.0;
+			}
+			else()
+			{
+				f = f + fLox;
+				bContinue = 0;
+			}
+			Objective_UpdateRequirement("sr_prop", 0, f);
+			f = fCraft;
+			if (f > 25.0)
+			{
+				f = 25.0;
+			}
+			Objective_UpdateRequirement("sr_craft", 0, f);
+			if (fCraft < 25.0)
+			{
+				bContinue = 0;
+			}
+			if (fFood < 3.0)
+			{
+				bContinue = 0;
+			}
+		}
+		nExperts = CountExperts();
+		f = nExperts;
+		Objective_UpdateRequirement("sr_crew", 0, f);
+		if (nExperts < 2)
+		{
+			bContinue = 0;
+		}
+		nTrack = CountTracking();
+		f = nTrack;
+		Objective_UpdateRequirement("sr_track", 0, f);
+		if (nTrack < 3)
+		{
+			bContinue = 0;
+		}
+		if (bContinue)
+		{
+			// launch: the goods are spent whatever happens
+			fNeedFuel = 80.0;
+			fNeedLox = 200.0;
+			fNeedCraft = 25.0;
+			fNeedFood = 3.0;
+			TakeNear();
+			Scenario_ObjectiveMoveCameraTo(padPos, 260.0);
+			Notification_CreateNewStringPic("Launch", "N1-L3 ignition... lift-off!", "research/sr_lunar_landing.png", padPos);
+			Script_Sleep(4.0);
+			fFail = 70 - 5 * rocketOK[4];
+			Research_IsCompleted("sr_nk33", r);
+			if (r)
+			{
+				fFail = fFail - 35;
+			}
+			if (fFail < 5)
+			{
+				fFail = 5;
+			}
+			Random(r);
+			r = r % 100;
+			fr = r;
+			Vehicle_Sell(nVeh, 0, 0);
+			if (fr < fFail)
+			{
+				Building_StartFire(nPad);
+				prestige = prestige - 2;
+				Notification_CreateNewStringPic("Launch failure", "The N1-L3 exploded. The pad is burning. Build another rocket and try again.", "research/sr_lunar_landing.png", padPos);
+			}
+			else()
+			{
+				srDone[7] = 1;
+				rocketOK[4] = rocketOK[4] + 1;
+				if (usDone[7])
+				{
+					prestige = prestige + 3;
+					Money_AddUSD(5000);
+					fLoyal = 0.03;
+					BoostLoyalty(fLoyal);
+					Scenario_WindowWithImageLeft("A Soviet footprint on the Moon", "The LK has landed. A Soviet cosmonaut stands on the Moon. The Americans did it first, but we are catching up.", "moon.png", 3);
+				}
+				else()
+				{
+					prestige = prestige + 10;
+					nFirsts = nFirsts + 1;
+					Money_AddUSD(25000);
+					fLoyal = 0.12;
+					BoostLoyalty(fLoyal);
+					Scenario_WindowWithImageLeft("A Soviet footprint on the Moon", "The LK has landed. A Soviet cosmonaut stands on the Moon. A Soviet first: the world is watching.", "moon.png", 3);
+				}
+				winexist = 1;
+				while (winexist)
+				{
+					Scenario_WindowExists(winexist);
+				}
+			}
+		}
+	}
+	Objective_Remove("sr_rocket");
+	Objective_Remove("sr_prop");
+	Objective_Remove("sr_craft");
+	Objective_Remove("sr_crew");
+	Objective_Remove("sr_track");
+
+	if (usDone[7])
+	{
+		Scenario_WindowWithImageLeft("The race is over", "We reached the Moon, but the Americans were there first. History will remember Apollo 11 - and the N1 that came after it.", "moon.png", 3);
+	}
+	else()
+	{
+		Scenario_WindowWithImageLeft("Victory in the Space Race", "A Soviet cosmonaut walked on the Moon before any American. From Sputnik to the N1, the republic won the race to space.", "moon.png", 3);
+		Money_AddUSD(100000);
+		fLoyal = 0.2;
+		BoostLoyalty(fLoyal);
+	}
+	winexist = 1;
+	while (winexist)
+	{
+		Scenario_WindowExists(winexist);
+	}
+	Scenario_ObjectiveSetCompleted("sr_race", 0, 1);
+	Scenario_UnlockNextScenarios();
+}
+

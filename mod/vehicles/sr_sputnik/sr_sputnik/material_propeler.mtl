@@ -1,0 +1,12 @@
+$SUBMATERIAL sr_white
+$TEXTURE_MTL 0 sr_white.dds
+$TEXTURE 1 blankspecular.dds
+$TEXTURE 2 blankbump.dds
+
+$DIFFUSECOLOR 1.0 1.0 1.0 1.0
+$SPECULARCOLOR 0.8 0.8 0.8 1.0
+$AMBIENTCOLOR 1.0 1.0 1.0 1.0
+
+$SPECULARPOWER 6.0
+
+$END

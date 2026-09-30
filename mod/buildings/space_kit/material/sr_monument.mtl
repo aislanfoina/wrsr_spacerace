@@ -1,0 +1,45 @@
+$SUBMATERIAL sr_stucco
+$TEXTURE_MTL 0 sr_stucco.dds
+$TEXTURE 1 buildings/blankspecular.dds
+$TEXTURE 2 buildings/blankbump.dds
+
+$DIFFUSECOLOR 0.92 0.92 0.92 1.0
+$SPECULARCOLOR 0.3 0.3 0.3 1.0
+$AMBIENTCOLOR 1.0 1.0 1.0 1.0
+
+$SPECULARPOWER 4.0
+
+$SUBMATERIAL sr_asphalt
+$TEXTURE_MTL 0 sr_asphalt.dds
+$TEXTURE 1 buildings/blankspecular.dds
+$TEXTURE 2 buildings/blankbump.dds
+
+$DIFFUSECOLOR 0.92 0.92 0.92 1.0
+$SPECULARCOLOR 0.3 0.3 0.3 1.0
+$AMBIENTCOLOR 1.0 1.0 1.0 1.0
+
+$SPECULARPOWER 4.0
+
+$SUBMATERIAL sr_dark
+$TEXTURE_MTL 0 sr_dark.dds
+$TEXTURE 1 buildings/blankspecular.dds
+$TEXTURE 2 buildings/blankbump.dds
+
+$DIFFUSECOLOR 0.92 0.92 0.92 1.0
+$SPECULARCOLOR 0.3 0.3 0.3 1.0
+$AMBIENTCOLOR 1.0 1.0 1.0 1.0
+
+$SPECULARPOWER 4.0
+
+$SUBMATERIAL sr_titanium
+$TEXTURE_MTL 0 sr_titanium.dds
+$TEXTURE 1 buildings/blankspecular.dds
+$TEXTURE 2 buildings/blankbump.dds
+
+$DIFFUSECOLOR 0.92 0.92 0.92 1.0
+$SPECULARCOLOR 0.8 0.8 0.8 1.0
+$AMBIENTCOLOR 1.0 1.0 1.0 1.0
+
+$SPECULARPOWER 24.0
+
+$END

@@ -1,0 +1,713 @@
+"""The Space Race programme: a persistent scenario the spacerace plugin starts in
+any ordinary game, gated by the space research branch.
+
+    python tools/space_scenario.py
+
+Writes mod/plugins/spacerace/data/scenarios/spacerace/ (the plugin copies it into
+media_soviet/scenarios/spacerace at start):
+    script.ini                    scenario header
+    programme/script.ini          the only mission; it runs the whole race
+    programme/programme.txt       the VM script (generated below)
+    programme/*.png               window images, from the kit's renders
+
+How it plays: the script sleeps until the Rocket Research Institute is
+researched, then walks the milestones in order. Each milestone waits for its
+research, a rocket of the right type parked on a launch pad (a heliport-type
+building it is assigned to), propellant and payload in storages within 450 m
+of the pad, cosmonauts (experts, education >= 3) and tracking stations. Then it
+launches: the goods are consumed, a failure roll decides (it falls with every
+success of that rocket; the N1 needs the NK-33 research), a failure burns the
+pad. The American timeline runs beside it by date; being first pays in dollars
+and loyalty, being second costs prestige. The last milestone is the N1 landing
+on the Moon: win it before 20 July 1969 and the race is won.
+
+Rockets are recognised by their engine power (9001..9005 kW, set in
+space_vehicles.py) because the VM's Vehicle struct has no type name.
+Goods: while the resources plugin is not in, lox and hypergolics are counted as
+chemicals and spacecraft as eletronics (FIELD below).
+"""
+import os
+import shutil
+import subprocess
+import sys
+
+from PIL import Image
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUT = os.path.join(ROOT, 'mod', 'plugins', 'spacerace', 'data', 'scenarios', 'spacerace')
+import space_goods as G  # noqa: E402  (the goods, shared with space_scene.py)
+# design goods a launch uses -> the game good and the script field that reads it
+LOAD_KEYS = (('fuel', 'fuel'), ('lox', 'lox'), ('hyper', 'hypergolic'), ('craft', 'spacecraft'), ('food', 'space_food'))
+FIELD = {k: G.field(g) for k, g in LOAD_KEYS}
+GOOD = {k: G.good(g) for k, g in LOAD_KEYS}
+RADIUS = 450.0
+# the mission folder new games run. A save keeps the running programme's state, so a mission that
+# saves already use never changes: a rewrite gets a new folder, and the old one lives on frozen in
+# mod/plugins/spacerace/legacy/ (copied in beside it). 'programme' ran the first in-game launch.
+MISSION = 'race'
+LEGACY = os.path.join(ROOT, 'mod', 'plugins', 'spacerace', 'legacy')
+
+# power: 9001 Sputnik, 9002 Vostok-K, 9003 Soyuz, 9004 Proton, 9005 N1
+MILESTONES = [
+    dict(key='sputnik', research='sr_satellite', power=9001, rocket='R-7 Sputnik', crew=0, track=0,
+         fuel=8, lox=20, craft=1, food=0, fail=30, icon='sr_satellite',
+         title='The first satellite',
+         brief='Put an artificial satellite into orbit. Park an R-7 Sputnik rocket on a launch complex, store kerosene, liquid oxygen and the satellite in buildings within 450 m of the pad, and it will fly.',
+         win='Beep... beep... beep. Sputnik is in orbit and every radio on Earth can hear it. The space age has begun, and it began here.',
+         us_y=1958, us_d=31, us_text='Explorer 1 is in orbit. The Americans have their satellite.'),
+    dict(key='laika', research='sr_biosatellite', power=9001, rocket='R-7 Sputnik', crew=0, track=0,
+         fuel=8, lox=20, craft=2, food=1, fail=25, icon='sr_biosatellite',
+         title='A passenger in orbit',
+         brief='Send a living passenger into orbit: a satellite with life support and food for the flight. Belka and Strelka came back; Laika did not.',
+         win='A living creature has orbited the Earth. Now we know a cosmonaut can survive up there.',
+         us_y=1961, us_d=31, us_text='Ham the chimpanzee has flown in an American capsule.'),
+    dict(key='luna', research='sr_lunar_probes', power=9002, rocket='Vostok-K', crew=0, track=1,
+         fuel=10, lox=25, craft=2, food=0, fail=35, icon='sr_lunar_probes',
+         title='To the Moon',
+         brief='Hit the Moon with a Luna probe. The Vostok-K and its Blok E upper stage can reach escape velocity; a tracking station must follow it.',
+         win='Luna has reached the Moon and left the pennant of the Soviet Union on its surface.',
+         us_y=1962, us_d=116, us_text='Ranger 4 has struck the far side of the Moon.'),
+    dict(key='vostok', research='sr_manned_flight', power=9002, rocket='Vostok-K', crew=1, track=1,
+         fuel=10, lox=25, craft=5, food=1, fail=15, icon='sr_manned_flight',
+         title='The first man in space',
+         brief='Put a cosmonaut into orbit and bring him back. You need a Vostok-K on the pad, the Vostok spacecraft, a trained cosmonaut (an expert from the Cosmonaut Training Centre) and a tracking station.',
+         win='Poyekhali! A Soviet cosmonaut has orbited the Earth and landed safely in the steppe. The whole world knows his name.',
+         us_y=1962, us_d=51, us_text='John Glenn has orbited the Earth in Friendship 7.'),
+    dict(key='voskhod', research='sr_eva', power=9003, rocket='Soyuz', crew=2, track=1,
+         fuel=12, lox=30, craft=6, food=1, fail=15, icon='sr_eva',
+         title='A walk in space',
+         brief='Two cosmonauts, an inflatable airlock and the first walk outside a spacecraft.',
+         win='A cosmonaut has floated outside his ship for twelve minutes, and got back in.',
+         us_y=1965, us_d=154, us_text='Ed White has walked in space from Gemini 4.'),
+    dict(key='soyuz', research='sr_soyuz', power=9003, rocket='Soyuz', crew=3, track=2,
+         fuel=12, lox=30, craft=7, food=2, fail=15, icon='sr_soyuz',
+         title='Rendezvous and docking',
+         brief='The Soyuz: three cosmonauts, rendezvous and docking in orbit - everything a Moon flight needs. Two tracking stations must follow it.',
+         win='Two ships have met and docked in orbit. The road to the Moon is open.',
+         us_y=1966, us_d=75, us_text='Gemini 8 has docked with its Agena target.'),
+    dict(key='zond', research='sr_proton', power=9004, rocket='Proton', crew=0, track=2,
+         fuel=0, lox=0, hyper=60, craft=8, food=0, fail=35, icon='sr_proton',
+         title='Around the Moon',
+         brief='Send a Zond spacecraft around the Moon and back on the Proton. It burns storable propellants (counted as chemicals here).',
+         win='Zond has flown round the Moon and splashed down with its tortoises alive.',
+         us_y=1968, us_d=356, us_text='Apollo 8 is in orbit around the Moon with three astronauts aboard.'),
+    dict(key='moon', research='sr_lunar_landing', power=9005, rocket='N1-L3', crew=2, track=3,
+         fuel=80, lox=200, craft=25, food=3, fail=70, icon='sr_lunar_landing',
+         title='A Soviet footprint on the Moon',
+         brief='The N1 has to fly. Park it on the Heavy Launch Complex with 80 t of kerosene, 200 t of liquid oxygen and 25 t of spacecraft in reach, two cosmonauts and three tracking stations. Without the NK-33 engines most N1s explode.',
+         win='The LK has landed. A Soviet cosmonaut stands on the Moon.',
+         us_y=1969, us_d=201, us_text='Apollo 11 has landed on the Moon. Neil Armstrong walks on its surface.'),
+]
+
+
+# the rocket each engine-power fingerprint stands for, and the load it takes at lift-off: the
+# largest any of its milestones needs, so what the objective asks for is what the plugin takes
+ROCKET_OF = {9001: 'sr_sputnik', 9002: 'sr_vostok', 9003: 'sr_soyuz', 9004: 'sr_proton', 9005: 'sr_n1'}
+LOADS = {}
+for _m in MILESTONES:
+    _m.setdefault('hyper', 0)
+    _l = LOADS.setdefault(ROCKET_OF[_m['power']], {k: 0 for k, _ in LOAD_KEYS})
+    for _k, _ in LOAD_KEYS:
+        _l[_k] = max(_l[_k], _m[_k])
+for _m in MILESTONES:
+    _m.update(LOADS[ROCKET_OF[_m['power']]])
+CLIMB_SECONDS = 18
+PAD_REPAIR_DAYS = 30    # a failed launch in a game without building fires closes the pad this long
+
+
+def research_name(key):
+    """Display name of a space research entry, from space_research.TREE."""
+    import space_research
+    for e in space_research.TREE:
+        if e[0] == key:
+            return e[6]
+    return key
+
+
+def esc(s):
+    return s.replace('"', "'")
+
+
+def gen_script():
+    L = []
+    a = L.append
+    a('include("SOVIETInstructions.txt");')
+    a('')
+    for v in ('i', 'j', 'k', 'n', 'r', 'day', 'year', 'winexist', 'bContinue', 'prestige', 'nVeh', 'nPad', 'nExperts', 'nTrack',
+              'nResearch', 'fi', 'fj', 'fk', 'fn', 'si', 'sn', 'ti', 'tn', 'bi', 'bn', 'ci', 'cn', 'nFirsts', 'nSeconds',
+              'li', 'ln', 'lk', 'rr', 'ki', 'kn', 'nCosmo', 'nCosmoShown', 'bObjReady', 'bCosmoObj',
+              'nBlockedPad', 'nBlockUntil', 'nNow', 'nPadOK', 'nTest'):
+        a('defineVariable(int, %s);' % v)
+    for v in ('f', 'f2', 'fFail', 'fFuel', 'fLox', 'fHyper', 'fCraft', 'fFood', 'fDist', 'fLoyal', 'fr', 'fCosmo', 'fUp'):
+        a('defineVariable(float, %s);' % v)
+    a('defineVariable(vec3, padPos);')
+    a('defineVariable(vec3, vtmp);')
+    a('defineVariable(vec3, cosmoPos);')
+    a('defineVariable(GameSetting, gs);')
+    a('defineVariable(Building, bui);')
+    a('defineVariable(Vehicle, vehi);')
+    a('defineVariable(Person, wor);')
+    a('defineVariable(Resources, res);')
+    a('defineArray(int[%d], srDone);' % len(MILESTONES))
+    a('defineArray(int[%d], usDone);' % len(MILESTONES))
+    a('defineArray(int[6], rocketOK);')
+    a('')
+    # --- experts: citizens with education >= 3 (the experts plugin makes them)
+    a('defineFunction(CountExperts, int)')
+    a('{')
+    a('\tfn = 0;')
+    a('\tScript_SetUpdateFrequency(20000);')
+    a('\tPerson_GetNumberOfPeople(cn);')
+    a('\tfor (ci=0, ci<cn, ci=ci+1)')
+    a('\t{')
+    a('\t\twor.GetDataByIndex(ci);')
+    a('\t\tif (wor.nValidRead & wor.fEducation > 2.999)')
+    a('\t\t{')
+    a('\t\t\tfn = fn + 1;')
+    a('\t\t}')
+    a('\t}')
+    a('\tScript_SetUpdateFrequency(5000);')
+    a('\treturn(fn);')
+    a('}')
+    a('')
+    # --- tracking stations: our TYPE_BROADCAST with 40 workers / 30 professors
+    a('defineFunction(CountTestStands, int)')
+    a('{')
+    a('\tfk = 0;')
+    a('\tBuilding_GetNumberOfBuildings(bn);')
+    a('\tfor (bi=0, bi<bn, bi=bi+1)')
+    a('\t{')
+    a('\t\tbui.GetDataByIndex(bi);')
+    a('\t\tif (bui.nValidRead & bui.nType ? BUILDINGTYPE_FACTORY & bui.nWorkersNeeded ? 80 & bui.nProffesorsNeeded ? 40 & bui.fPercFinished > 0.9999 & bui.nWorkersNum > 0)')
+    a('\t\t{')
+    a('\t\t\tfk = fk + 1;')
+    a('\t\t}')
+    a('\t}')
+    a('\treturn(fk);')
+    a('}')
+    a('')
+    a('defineFunction(CountTracking, int)')
+    a('{')
+    a('\tfk = 0;')
+    a('\tBuilding_GetNumberOfBuildings(bn);')
+    a('\tfor (bi=0, bi<bn, bi=bi+1)')
+    a('\t{')
+    a('\t\tbui.GetDataByIndex(bi);')
+    a('\t\tif (bui.nValidRead & bui.nType ? BUILDINGTYPE_BROADCAST & bui.nProffesorsNeeded ? 30 & bui.nWorkersNeeded ? 40 & bui.fPercFinished > 0.9999)')
+    a('\t\t{')
+    a('\t\t\tfk = fk + 1;')
+    a('\t\t}')
+    a('\t}')
+    a('\treturn(fk);')
+    a('}')
+    a('')
+    # --- a rocket of the wanted power, parked at the heliport-type building it belongs to
+    a('defineFunction(FindRocket, int, float:fPowerWanted)')
+    a('{')
+    a('\tfi = 0 - 1;')
+    a('\tVehicle_GetNumberOfVehicles(tn);')
+    a('\tfor (ti=0, ti<tn, ti=ti+1)')
+    a('\t{')
+    a('\t\tvehi.GetDataByIndex(ti);')
+    a('\t\tif (vehi.nValidRead & vehi.nVehicleType ? VEHICLETYPE_HELICOPTER & vehi.fType_EnginePower > fPowerWanted - 0.5 & vehi.fType_EnginePower < fPowerWanted + 0.5)')
+    a('\t\t{')
+    a('\t\t\tfj = vehi.nBuilding_HomeWorkplaceID;')
+    a('\t\t\tif (fj > -1)')
+    a('\t\t\t{')
+    a('\t\t\t\tbui.GetDataByIndex(fj);')
+    a('\t\t\t\tif (bui.nValidRead & bui.nType ? BUILDINGTYPE_AIRPLANE_PARKING)')
+    a('\t\t\t\t{')
+    a('\t\t\t\t\tfDist = DistancePoints2D(vehi.vPosition, bui.vPosition);')
+    a('\t\t\t\t\tnPadOK = 1;')
+    a('\t\t\t\t\tif (fj ? nBlockedPad)')
+    a('\t\t\t\t\t{')
+    a('\t\t\t\t\t\tnNow = year * 365 + day;')
+    a('\t\t\t\t\t\tif (nNow < nBlockUntil)')
+    a('\t\t\t\t\t\t{')
+    a('\t\t\t\t\t\t\tnPadOK = 0;')
+    a('\t\t\t\t\t\t}')
+    a('\t\t\t\t\t}')
+    a('\t\t\t\t\tif (fDist < 90.0 & nPadOK)')
+    a('\t\t\t\t\t{')
+    a('\t\t\t\t\t\tfi = ti;')
+    a('\t\t\t\t\t\tnPad = fj;')
+    a('\t\t\t\t\t\tpadPos = bui.vPosition;')
+    a('\t\t\t\t\t}')
+    a('\t\t\t\t}')
+    a('\t\t\t}')
+    a('\t\t}')
+    a('\t}')
+    a('\treturn(fi);')
+    a('}')
+    a('')
+    # --- goods stored near the pad
+    a('defineFunction(SumNear, void)')
+    a('{')
+    a('\tfFuel = 0; fLox = 0; fHyper = 0; fCraft = 0; fFood = 0;')
+    a('\tScript_SetUpdateFrequency(20000);')
+    a('\tBuilding_GetNumberOfBuildings(sn);')
+    a('\tfor (si=0, si<sn, si=si+1)')
+    a('\t{')
+    a('\t\tbui.GetDataByIndex(si);')
+    a('\t\tif (bui.nValidRead & bui.nType ? BUILDINGTYPE_STORAGE & bui.nStorageNum > 0)')
+    a('\t\t{')
+    a('\t\t\tfDist = DistancePoints2D(bui.vPosition, padPos);')
+    a('\t\t\tif (fDist < %.1f)' % RADIUS)
+    a('\t\t\t{')
+    a('\t\t\t\tres.ResetAmounts();')
+    a('\t\t\t\tres.GetFromBuilding(si);')
+    a('\t\t\t\tfFuel = fFuel + res.%s;' % FIELD['fuel'])
+    a('\t\t\t\tfLox = fLox + res.%s;' % FIELD['lox'])
+    a('\t\t\t\tfHyper = fHyper + res.%s;' % FIELD['hyper'])
+    a('\t\t\t\tfCraft = fCraft + res.%s;' % FIELD['craft'])
+    a('\t\t\t\tfFood = fFood + res.%s;' % FIELD['food'])
+    a('\t\t\t}')
+    a('\t\t}')
+    a('\t}')
+    a('\tScript_SetUpdateFrequency(5000);')
+    a('\treturnVoid();')
+    a('}')
+    a('')
+    # --- research that counts as done: really researched, or research switched off in this game
+    a('defineFunction(IsResearched, int, string:sResearchKey)')
+    a('{')
+    a('\tgs.GetCurrentGameSettigns();')
+    a('\tif (!gs.Research)')
+    a('\t{')
+    a('\t\treturn(1);')
+    a('\t}')
+    a('\trr = 0;')
+    a('\tResearch_IsCompleted(sResearchKey, rr);')
+    a('\treturn(rr);')
+    a('}')
+    a('')
+    # --- the rocket being launched: flagged by Vehicle_SetCanSell until the spacerace plugin has
+    # --- flown it (lk = 1 while flagged), or already high above its pad
+    a('defineFunction(FindLaunched, int, float:fPowerLaunched)')
+    a('{')
+    a('\tli = 0 - 1;')
+    a('\tlk = 0;')
+    a('\tVehicle_GetNumberOfVehicles(ln);')
+    a('\tfor (ki=0, ki<ln, ki=ki+1)')
+    a('\t{')
+    a('\t\tvehi.GetDataByIndex(ki);')
+    a('\t\tif (vehi.nValidRead & vehi.nVehicleType ? VEHICLETYPE_HELICOPTER & vehi.fType_EnginePower > fPowerLaunched - 0.5 & vehi.fType_EnginePower < fPowerLaunched + 0.5)')
+    a('\t\t{')
+    a('\t\t\tvtmp = vehi.vPosition;')
+    a('\t\t\tfUp = vtmp.y - padPos.y;')
+    a('\t\t\tif (vehi.bDisableSell)')
+    a('\t\t\t{')
+    a('\t\t\t\tli = ki;')
+    a('\t\t\t\tlk = 1;')
+    a('\t\t\t}')
+    a('\t\t\telse()')
+    a('\t\t\t{')
+    a('\t\t\t\tif (fUp > 20.0)')
+    a('\t\t\t\t{')
+    a('\t\t\t\t\tli = ki;')
+    a('\t\t\t\t}')
+    a('\t\t\t}')
+    a('\t\t}')
+    a('\t}')
+    a('\treturn(li);')
+    a('}')
+    a('')
+    # --- experts (education >= 3): a permanent line in the objective and a notice for each new one
+    a('defineFunction(CheckCosmonauts, void)')
+    a('{')
+    a('\tif (bObjReady)')
+    a('\t{')
+    a('\t\tnCosmo = 0;')
+    a('\t\tScript_SetUpdateFrequency(20000);')
+    a('\t\tPerson_GetNumberOfPeople(kn);')
+    a('\t\tfor (ki=0, ki<kn, ki=ki+1)')
+    a('\t\t{')
+    a('\t\t\twor.GetDataByIndex(ki);')
+    a('\t\t\tif (wor.nValidRead & wor.fEducation > 2.999)')
+    a('\t\t\t{')
+    a('\t\t\t\tnCosmo = nCosmo + 1;')
+    a('\t\t\t\tcosmoPos = wor.vPosition;')
+    a('\t\t\t}')
+    a('\t\t}')
+    a('\t\tScript_SetUpdateFrequency(5000);')
+    a('\t\tif (!bCosmoObj)')
+    a('\t\t{')
+    a('\t\t\tObjectives_CreateNewString("sr_cosmo", "Experts: cosmonauts and chief designers");')
+    a('\t\t\tObjective_AddRequirement("sr_cosmo", 3.0, "research/sr_manned_flight.png");')
+    a('\t\t\tbCosmoObj = 1;')
+    a('\t\t}')
+    a('\t\tfCosmo = nCosmo;')
+    a('\t\tObjective_UpdateRequirement("sr_cosmo", 0, fCosmo);')
+    a('\t\tif (nCosmo > nCosmoShown)')
+    a('\t\t{')
+    a('\t\t\tNotification_CreateNewStringPic("A new expert", "Star City has trained a cosmonaut, or OKB-1 a chief designer. The objective counts every expert in the republic.", "research/sr_manned_flight.png", cosmoPos);')
+    a('\t\t\tnCosmoShown = nCosmo;')
+    a('\t\t}')
+    a('\t}')
+    a('\treturnVoid();')
+    a('}')
+    a('')
+    # --- loyalty for everyone
+    a('defineFunction(BoostLoyalty, void, float:fDelta)')
+    a('{')
+    a('\tScript_SetUpdateFrequency(20000);')
+    a('\tPerson_GetNumberOfPeople(cn);')
+    a('\tfor (ci=0, ci<cn, ci=ci+1)')
+    a('\t{')
+    a('\t\twor.GetDataByIndex(ci);')
+    a('\t\tif (wor.nValidRead)')
+    a('\t\t{')
+    a('\t\t\tf2 = wor.fStatusSoviet + fDelta;')
+    a('\t\t\tif (f2 > 1.0) { f2 = 1.0; }')
+    a('\t\t\tif (f2 < 0.0) { f2 = 0.0; }')
+    a('\t\t\tPerson_SetStatus(ci, 3, f2);')
+    a('\t\t}')
+    a('\t}')
+    a('\tScript_SetUpdateFrequency(5000);')
+    a('\treturnVoid();')
+    a('}')
+    a('')
+    # --- the American timeline, announced as the dates pass
+    a('defineFunction(CheckUSA, void)')
+    a('{')
+    a('\tCheckCosmonauts();')
+    a('\tDate_GetCurrentDate_D365Y(day, year);')
+    for idx, m in enumerate(MILESTONES):
+        a('\tif (!usDone[%d] & (year > %d | (year ? %d & day > %d)))' % (idx, m['us_y'], m['us_y'], m['us_d'] - 1))
+        a('\t{')
+        a('\t\tusDone[%d] = 1;' % idx)
+        a('\t\tif (srDone[%d])' % idx)
+        a('\t\t{')
+        a('\t\t\tNotification_CreateNewStringPic("United States", "%s We were there first.", "research/%s.png", padPos);' % (esc(m['us_text']), m['icon']))
+        a('\t\t}')
+        a('\t\telse()')
+        a('\t\t{')
+        a('\t\t\tNotification_CreateNewStringPic("United States", "%s The Americans got there first.", "research/%s.png", padPos);' % (esc(m['us_text']), m['icon']))
+        a('\t\t\tprestige = prestige - 5;')
+        a('\t\t\tnSeconds = nSeconds + 1;')
+        a('\t\t\tfLoyal = 0.0 - 0.05;')
+        a('\t\t\tBoostLoyalty(fLoyal);')
+        a('\t\t}')
+        a('\t}')
+    a('\treturnVoid();')
+    a('}')
+    a('')
+    # --- main
+    a('defineFunction(main, void)')
+    a('{')
+    a('\tInitConstants();')
+    a('\tprestige = 0; nFirsts = 0; nSeconds = 0; bObjReady = 0; bCosmoObj = 0; nCosmoShown = 0; nBlockUntil = 0;')
+    a('\tnBlockedPad = 0 - 1;')
+    a('\tfor (i=0, i<%d, i=i+1) { srDone[i] = 0; usDone[i] = 0; }' % len(MILESTONES))
+    a('\tfor (i=0, i<6, i=i+1) { rocketOK[i] = 0; }')
+    a('\t// wait quietly for the first space research - an ordinary republic never notices this script')
+    a('\tnResearch = 0;')
+    a('\twhile (!nResearch)')
+    a('\t{')
+    a('\t\tScript_Sleep(30.0);')
+    a('\t\tnResearch = IsResearched("sr_rocketry");')
+    a('\t\tCheckUSA();')
+    a('\t}')
+    a('\tScenario_WindowWithImageLeft("The Space Programme", "The Rocket Research Institute has opened. Korolev\'s designers promise a satellite before the Americans, then a man in space, then the Moon. Research the space branch, build the plants, the launch complexes and the cosmonaut corps. The Americans will not wait: they are racing towards Apollo 11 in July 1969.", "programme.png", 3);')
+    a('\twinexist = 1;')
+    a('\twhile (winexist) { Scenario_WindowExists(winexist); }')
+    a('\tScenario_ObjectiveCreate("sr_race", "The Space Race", "Reach every milestone before the United States. The last one: an N1 carrying cosmonauts to the Moon before 20 July 1969.");')
+    a('\tbObjReady = 1;')
+    for idx, m in enumerate(MILESTONES):
+        p = m['power'] - 9001
+        a('')
+        a('\t// ---------------------------------------------------------------- %s' % m['key'])
+        a('\tObjectives_CreateNewString("sr_next", "Next: %s - research %s");' % (esc(m['title']), esc(research_name(m['research']))))
+        a('\tObjective_AddRequirement("sr_next", 1.0, "research/%s.png");' % m['icon'])
+        a('\tnResearch = 0;')
+        a('\twhile (!nResearch)')
+        a('\t{')
+        a('\t\tScript_Sleep(20.0);')
+        a('\t\tnResearch = IsResearched("%s");' % m['research'])
+        a('\t\tCheckUSA();')
+        a('\t}')
+        a('\tObjective_Remove("sr_next");')
+        a('\tScenario_WindowWithImageLeft("%s", "%s", "%s.png", 3);' % (esc(m['title']), esc(m['brief']), m['key']))
+        a('\twinexist = 1;')
+        a('\twhile (winexist) { Scenario_WindowExists(winexist); }')
+        a('\tObjectives_CreateNewString("sr_rocket", "%s on a launch pad");' % m['rocket'])
+        a('\tObjective_AddRequirement("sr_rocket", 1.0, "research/%s.png");' % m['icon'])
+        need_prop = m['fuel'] + m['lox'] + m['hyper']
+        a('\tObjectives_CreateNewString("sr_prop", "Propellant near the pad (t)");')
+        a('\tObjective_AddRequirement("sr_prop", %.1f, "resources/fuel.png");' % need_prop)
+        a('\tObjectives_CreateNewString("sr_craft", "Payload near the pad (t)");')
+        a('\tObjective_AddRequirement("sr_craft", %.1f, "resources/%s.png");' % (m['craft'], GOOD['craft']))
+        if m['crew']:
+            a('\tObjectives_CreateNewString("sr_crew", "Cosmonauts (experts)");')
+            a('\tObjective_AddRequirement("sr_crew", %.1f, "research/sr_manned_flight.png");' % m['crew'])
+        if m['track']:
+            a('\tObjectives_CreateNewString("sr_track", "Tracking stations");')
+            a('\tObjective_AddRequirement("sr_track", %.1f, "research/sr_satellite.png");' % m['track'])
+        a('\twhile (!srDone[%d])' % idx)
+        a('\t{')
+        a('\t\tScript_Sleep(10.0);')
+        a('\t\tCheckUSA();')
+        a('\t\tbContinue = 1;')
+        a('\t\tnVeh = FindRocket(%d.0);' % m['power'])
+        a('\t\tif (nVeh > -1) { Objective_UpdateRequirement("sr_rocket", 0, 1.0); }')
+        a('\t\telse() { Objective_UpdateRequirement("sr_rocket", 0, 0.0); bContinue = 0; }')
+        a('\t\tif (bContinue)')
+        a('\t\t{')
+        a('\t\t\tSumNear();')
+        a('\t\t\tf = 0;')
+        if m['fuel']:
+            a('\t\t\tif (fFuel > %.1f) { f = f + %.1f; } else() { f = f + fFuel; bContinue = 0; }' % (m['fuel'], m['fuel']))
+        if m['lox']:
+            a('\t\t\tif (fLox > %.1f) { f = f + %.1f; } else() { f = f + fLox; bContinue = 0; }' % (m['lox'], m['lox']))
+        if m['hyper']:
+            a('\t\t\tif (fHyper > %.1f) { f = f + %.1f; } else() { f = f + fHyper; bContinue = 0; }' % (m['hyper'], m['hyper']))
+        a('\t\t\tObjective_UpdateRequirement("sr_prop", 0, f);')
+        a('\t\t\tf = fCraft;')
+        a('\t\t\tif (f > %.1f) { f = %.1f; }' % (m['craft'], m['craft']))
+        a('\t\t\tObjective_UpdateRequirement("sr_craft", 0, f);')
+        a('\t\t\tif (fCraft < %.1f) { bContinue = 0; }' % m['craft'])
+        if m['food']:
+            a('\t\t\tif (fFood < %.1f) { bContinue = 0; }' % m['food'])
+        a('\t\t}')
+        if m['crew']:
+            a('\t\tnExperts = CountExperts();')
+            a('\t\tf = nExperts;')
+            a('\t\tObjective_UpdateRequirement("sr_crew", 0, f);')
+            a('\t\tif (nExperts < %d) { bContinue = 0; }' % m['crew'])
+        if m['track']:
+            a('\t\tnTrack = CountTracking();')
+            a('\t\tf = nTrack;')
+            a('\t\tObjective_UpdateRequirement("sr_track", 0, f);')
+            a('\t\tif (nTrack < %d) { bContinue = 0; }' % m['track'])
+        a('\t\tif (bContinue)')
+        a('\t\t{')
+        a('\t\t\t// launch: the spacerace plugin takes the load from the storages and flies the flagged rocket')
+        a('\t\t\tScenario_ObjectiveMoveCameraTo(padPos, 260.0);')
+        a('\t\t\tNotification_CreateNewStringPic("Launch", "%s ignition... lift-off!", "research/%s.png", padPos);' % (m['rocket'], m['icon']))
+        a('\t\t\tScript_Sleep(4.0);')
+        a('\t\t\tfFail = %d - 5 * rocketOK[%d];' % (m['fail'], p))
+        if m['key'] == 'moon':
+            a('\t\t\tr = IsResearched("sr_nk33");')
+            a('\t\t\tif (r) { fFail = fFail - 35; }')
+        a('\t\t\tnTest = CountTestStands();')
+        a('\t\t\tif (nTest > 0) { fFail = fFail - 10; }')
+        a('\t\t\tif (fFail < 5) { fFail = 5; }')
+        a('\t\t\tRandom(r);')
+        a('\t\t\tr = r % 100;')
+        a('\t\t\tfr = r;')
+        a('\t\t\tVehicle_SetCanSell(nVeh, 0);')
+        a('\t\t\tif (fr < fFail)')
+        a('\t\t\t{')
+        a('\t\t\t\tScript_Sleep(3.0);')
+        a('\t\t\t\tnVeh = FindLaunched(%d.0);' % m['power'])
+        a('\t\t\t\tif (nVeh > -1) { Vehicle_Sell(nVeh, 0, 0); }')
+        a('\t\t\t\tprestige = prestige - 2;')
+        a('\t\t\t\tgs.GetCurrentGameSettigns();')
+        a('\t\t\t\tif (gs.FiresEnabled)')
+        a('\t\t\t\t{')
+        a('\t\t\t\t\tBuilding_StartFire(nPad);')
+        a('\t\t\t\t\tNotification_CreateNewStringPic("Launch failure", "The %s exploded. The pad is burning: send the fire brigade, then build another rocket and try again.", "research/%s.png", padPos);' % (m['rocket'], m['icon']))
+        a('\t\t\t\t}')
+        a('\t\t\t\telse()')
+        a('\t\t\t\t{')
+        a('\t\t\t\t\tDate_GetCurrentDate_D365Y(day, year);')
+        a('\t\t\t\t\tnBlockedPad = nPad;')
+        a('\t\t\t\t\tnBlockUntil = year * 365 + day + %d;' % PAD_REPAIR_DAYS)
+        a('\t\t\t\t\tNotification_CreateNewStringPic("Launch failure", "The %s exploded and wrecked the pad. Repairs take %d days; build another rocket meanwhile.", "research/%s.png", padPos);' % (m['rocket'], PAD_REPAIR_DAYS, m['icon']))
+        a('\t\t\t\t}')
+        a('\t\t\t}')
+        a('\t\t\telse()')
+        a('\t\t\t{')
+        a('\t\t\t\t// the plugin clears the flag when the climb is over (at most a minute)')
+        a('\t\t\t\tk = 0;')
+        a('\t\t\t\tbContinue = 1;')
+        a('\t\t\t\twhile (bContinue)')
+        a('\t\t\t\t{')
+        a('\t\t\t\t\tScript_Sleep(1.0);')
+        a('\t\t\t\t\tk = k + 1;')
+        a('\t\t\t\t\tnVeh = FindLaunched(%d.0);' % m['power'])
+        a('\t\t\t\t\tif (nVeh < 0 | !lk | k > 60) { bContinue = 0; }')
+        a('\t\t\t\t}')
+        a('\t\t\t\tif (nVeh > -1) { Vehicle_Sell(nVeh, 0, 0); }')
+        a('\t\t\t\tsrDone[%d] = 1;' % idx)
+        a('\t\t\t\trocketOK[%d] = rocketOK[%d] + 1;' % (p, p))
+        a('\t\t\t\tif (usDone[%d])' % idx)
+        a('\t\t\t\t{')
+        a('\t\t\t\t\tprestige = prestige + 3;')
+        a('\t\t\t\t\tMoney_AddUSD(5000);')
+        a('\t\t\t\t\tfLoyal = 0.03;')
+        a('\t\t\t\t\tBoostLoyalty(fLoyal);')
+        a('\t\t\t\t\tScenario_WindowWithImageLeft("%s", "%s The Americans did it first, but we are catching up.", "%s.png", 3);' % (esc(m['title']), esc(m['win']), m['key']))
+        a('\t\t\t\t}')
+        a('\t\t\t\telse()')
+        a('\t\t\t\t{')
+        a('\t\t\t\t\tprestige = prestige + 10;')
+        a('\t\t\t\t\tnFirsts = nFirsts + 1;')
+        a('\t\t\t\t\tMoney_AddUSD(25000);')
+        a('\t\t\t\t\tfLoyal = 0.12;')
+        a('\t\t\t\t\tBoostLoyalty(fLoyal);')
+        a('\t\t\t\t\tScenario_WindowWithImageLeft("%s", "%s A Soviet first: the world is watching.", "%s.png", 3);' % (esc(m['title']), esc(m['win']), m['key']))
+        a('\t\t\t\t}')
+        a('\t\t\t\twinexist = 1;')
+        a('\t\t\t\twhile (winexist) { Scenario_WindowExists(winexist); }')
+        a('\t\t\t}')
+        a('\t\t}')
+        a('\t}')
+        for o in ('sr_rocket', 'sr_prop', 'sr_craft') + (('sr_crew',) if m['crew'] else ()) + (('sr_track',) if m['track'] else ()):
+            a('\tObjective_Remove("%s");' % o)
+    last = len(MILESTONES) - 1
+    a('')
+    a('\tif (usDone[%d])' % last)
+    a('\t{')
+    a('\t\tScenario_WindowWithImageLeft("The race is over", "We reached the Moon, but the Americans were there first. History will remember Apollo 11 - and the N1 that came after it.", "moon.png", 3);')
+    a('\t}')
+    a('\telse()')
+    a('\t{')
+    a('\t\tScenario_WindowWithImageLeft("Victory in the Space Race", "A Soviet cosmonaut walked on the Moon before any American. From Sputnik to the N1, the republic won the race to space.", "moon.png", 3);')
+    a('\t\tMoney_AddUSD(100000);')
+    a('\t\tfLoyal = 0.2;')
+    a('\t\tBoostLoyalty(fLoyal);')
+    a('\t}')
+    a('\twinexist = 1;')
+    a('\twhile (winexist) { Scenario_WindowExists(winexist); }')
+    a('\tScenario_ObjectiveSetCompleted("sr_race", 0, 1);')
+    a('\tScenario_UnlockNextScenarios();')
+    a('}')
+    return '\r\n'.join(L) + '\r\n'
+
+
+def vanilla_style(src):
+    """Re-flow the script the way vanilla scripts are written: one statement per line,
+    braces on their own lines. Strings and // comments are left intact."""
+    out = []
+    depth = 0
+    for raw in src.split('\r\n'):
+        line = raw.strip()
+        if not line or line.startswith('//') or line.startswith('include(') or line.startswith('define'):
+            if line.startswith('defineFunction') or not line.startswith('define'):
+                out.append('\t' * depth + line if line else '')
+            else:
+                out.append('\t' * depth + line)
+            continue
+        buf = ''
+        instr = False
+        paren = 0
+        for ch in line:
+            if ch == '"':
+                instr = not instr
+                buf += ch
+                continue
+            if instr:
+                buf += ch
+                continue
+            if ch == '(':
+                paren += 1
+            elif ch == ')':
+                paren -= 1
+            if ch == '{' and paren == 0:
+                if buf.strip():
+                    out.append('\t' * depth + buf.strip())
+                out.append('\t' * depth + '{')
+                depth += 1
+                buf = ''
+            elif ch == '}' and paren == 0:
+                if buf.strip():
+                    out.append('\t' * depth + buf.strip())
+                depth -= 1
+                out.append('\t' * depth + '}')
+                buf = ''
+            elif ch == ';' and paren == 0:
+                out.append('\t' * depth + (buf + ';').strip())
+                buf = ''
+            else:
+                buf += ch
+        if buf.strip():
+            out.append('\t' * depth + buf.strip())
+    assert depth == 0, 'unbalanced braces while re-flowing'
+    return '\r\n'.join(out) + '\r\n'
+
+
+def lint(src):
+    """No VM here, so catch what can be caught: brace balance and undeclared names."""
+    import re
+    assert src.count('{') == src.count('}'), 'unbalanced braces'
+    assert src.count('(') == src.count(')'), 'unbalanced parentheses'
+    code = re.sub(r'"[^"]*"', '""', src)
+    code = re.sub(r'//[^\n]*', '', code)
+    declared = set(re.findall(r'defineVariable\(\w+, (\w+)\)', code)) | set(re.findall(r'defineArray\(\w+\[\d+\], (\w+)\)', code))
+    declared |= set(re.findall(r'defineFunction\((\w+),', code))
+    declared |= set(re.findall(r'\w+:(\w+)', code))
+    body = code.split('defineFunction(CountExperts', 1)[1]
+    names = set(re.findall(r'(?<![\.\w])([a-z]\w*)(?=\s*(?:=[^=]|\[|\.|\)|,|;| [<>?&|+\-*/%]))', body))
+    known = declared | {'if', 'else', 'while', 'for', 'return', 'include', 'defineFunction', 'void', 'int', 'float', 'vec3'}
+    missing = sorted(n for n in names if n not in known)
+    return missing
+
+
+def images():
+    """Window images from the kit renders (vanilla window art is about 400 x 400)."""
+    src = {'programme': ('build/space_vehicles/showcase_lineup.png', None),
+           'sputnik': ('build/space/bureau.png', None), 'laika': ('build/space/recovery.png', None),
+           'luna': ('build/space/tracking.png', None), 'vostok': ('build/space_vehicles/showcase_sr_pad_r7.png', None),
+           'voskhod': ('build/space/training.png', None), 'soyuz': ('build/space/spacecraft.png', None),
+           'zond': ('build/space/propellant.png', None), 'moon': ('build/space_vehicles/showcase_sr_pad_n1.png', None)}
+    mdir = os.path.join(OUT, MISSION)
+    for key, (p, _) in src.items():
+        im = Image.open(os.path.join(ROOT, p)).convert('RGB')
+        w, h = im.size
+        s = min(w, h)
+        im = im.crop(((w - s) // 2, (h - s) // 2, (w + s) // 2, (h + s) // 2)).resize((400, 400), Image.LANCZOS).transpose(Image.FLIP_LEFT_RIGHT)
+        im.save(os.path.join(mdir, key + '.png'))
+    Image.open(os.path.join(mdir, 'programme.png')).save(os.path.join(OUT, 'previewimage.png'))
+    Image.open(os.path.join(mdir, 'programme.png')).resize((128, 128), Image.LANCZOS).save(os.path.join(OUT, 'icon.png'))
+    Image.open(os.path.join(mdir, 'moon.png')).save(os.path.join(OUT, 'end.png'))
+    Image.open(os.path.join(mdir, 'programme.png')).resize((128, 128), Image.LANCZOS).save(os.path.join(mdir, 'icon.png'))
+
+
+def main():
+    if os.path.isdir(OUT):
+        shutil.rmtree(OUT)
+    os.makedirs(os.path.join(OUT, MISSION))
+    for d in sorted(os.listdir(LEGACY)):
+        if os.path.isdir(os.path.join(LEGACY, d)):
+            shutil.copytree(os.path.join(LEGACY, d), os.path.join(OUT, d))
+    open(os.path.join(OUT, 'script.ini'), 'w', newline='').write('\r\n'.join([
+        '$NAME_STR "The Space Race"',
+        '$DESCRIPTION_STR "Beat the United States to orbit, to a man in space and to the Moon. Starts itself in any game; nothing happens until the Rocket Research Institute is researched."',
+        '$END_TEXT_STR "The race to the Moon is over."',
+        '$AVAILABLE_ON_ALL_MAPS', '$END', '']))
+    open(os.path.join(OUT, MISSION, 'script.ini'), 'w', newline='').write('\r\n'.join([
+        '$RUNSCRIPT %s.txt' % MISSION, '$NAME_STR "The Space Race"',
+        '$DESCRIPTION_STR "From Sputnik to the N1: eight milestones against the American timeline."',
+        '$TREEXPOS 0', '$STARTUNLOCKED', '$END', '']))
+    src = vanilla_style(gen_script())
+    assert '>=' not in src and '<=' not in src and '!=' not in src and '==' not in src, 'operator the VM lacks'
+    missing = lint(src)
+    lines = ['; generated by tools/space_scenario.py (goods from space_goods.py) - read by the spacerace plugin.',
+             '; What each rocket takes at lift-off from storage buildings within `radius` of its pad, and how long',
+             '; the plugin flies it before the script removes it.',
+             'radius %.0f' % RADIUS, 'climb_seconds %d' % CLIMB_SECONDS]
+    lines += ['; effects from particleeffect/particleeffects.ini: under the rocket, its trail, round the pad at lift-off, a failure',
+              'fx_flame airplane_jet', 'fx_smoke big_firesmoke', 'fx_pad factory_big_white', 'fx_boom buildingfall2',
+              ]
+    lines += ['; vm_goods: added goods scripts may read, answered with _Resources_reserved_16_.._19_ in this order']
+    lines += ['vm_goods ' + ' '.join(G.VM_GOODS) if G.USE_NEW_GOODS else '; (stand-in goods: no vm_goods)']
+    lines += ['; rocket <object> <the only pad kind it may stand on> then <good> <tonnes> pairs taken at lift-off']
+    for k, v in LOADS.items():
+        pairs = ' '.join('%s %g' % (GOOD[key], v[key]) for key, _ in LOAD_KEYS if v[key])
+        lines.append('rocket %s %s %s' % (k, 'sr_pad_n1' if k == 'sr_n1' else 'sr_pad_r7', pairs))
+    if G.USE_NEW_GOODS:
+        lines += ['; bill <object> then <good> <tonnes> pairs: what the MIK builds it from (workdays stay the engine\'s)']
+        lines += ['bill %s %s' % (k, ' '.join('%s %g' % gt for gt in v)) for k, v in G.BILL.items()]
+    open(os.path.join(ROOT, 'mod', 'plugins', 'spacerace', 'data', 'launches.ini'), 'w', newline='').write('\r\n'.join(lines) + '\r\n')
+    open(os.path.join(OUT, MISSION, MISSION + '.txt'), 'w', newline='').write(src)
+    images()
+    print('scenario: %d milestones, %d lines of VM script; undeclared names: %s' % (len(MILESTONES), src.count('\r\n'), missing or 'none'))
+    # the compiler's own rules (argument types, function endings, fields, ...): see tools/vmcheck.py
+    r = subprocess.run([sys.executable, os.path.join(ROOT, 'tools', 'vmcheck.py'), os.path.join(OUT, MISSION, MISSION + '.txt')])
+    if r.returncode:
+        sys.exit('vmcheck found problems in the generated script')
+
+
+if __name__ == '__main__':
+    main()

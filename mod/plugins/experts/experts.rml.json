@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "space-race.experts",
+  "name": "Experts",
+  "version": "0.1.0",
+  "author": "Aislan",
+  "description": "A fourth education tier. Graduates who spend time inside a training building listed in experts.ini climb past education 3.0 and become experts (cosmonauts, chief designers). Saved with the citizen; removing the plugin leaves them as graduates.",
+  "dll": "experts.dll",
+  "loaderApi": { "min": 1, "max": 1 },
+  "supportedGameVersions": ["1.1.1.9"],
+  "requiredSymbols": [], "optionalSymbols": [],
+  "hookIntents": [
+    { "symbol": "wrsr.observed.rva_00139a70", "interaction": "post-hook", "phase": "runtime", "temperature": "UNKNOWN" }
+  ],
+  "dependencies": [], "conflicts": [], "loadBefore": [], "loadAfter": [],
+  "defaultPriority": 9760,
+  "enabledByDefault": true
+}
