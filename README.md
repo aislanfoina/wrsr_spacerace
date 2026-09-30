@@ -1,53 +1,134 @@
 # Space Race for Workers & Resources: Soviet Republic
 
-A mod that turns the sandbox into a race: build a Soviet space industry, train cosmonauts
-and fly the milestones of the real programme — Sputnik, a man in orbit, the first
-spacewalk, docking, the Moon — before the United States does. The last one is the N1
-landing on the Moon before Apollo 11 (20 July 1969).
+## COMRADE, THE AMERICANS ARE BUILDING A ROCKET!
 
-Nothing starts until you research the Rocket Research Institute, so the programme sits
-quietly in any ordinary game (an Early Start 1920 game can reach it by the 1950s).
+Your republic pours concrete by the thousand tonnes, bakes bread for a million citizens and
+runs trains on time, and yet the night sky above it contains **nothing Soviet whatsoever?**
 
-> **Status: in development.** Everything below has run in the game, but the balance has
-> not been played through yet. `mod/plugins/spacerace/spacerace.ini` ships with
-> `test_mode = 1` (space research at 5 % of its cost); set it to `0` for real play.
+Your best graduates are wasting their education in a distribution office when they could
+be orbiting the planet?
 
-## What it adds
+Your steppe has plenty of empty space, and none of it is shaped like a launch pad?
 
-- **A space branch in the research tree** — 17 entries from 1946 to 1966, hanging off
-  *Advanced Engineering Study* and *Electronic Circuits*, each unlocking its buildings.
-- **16 buildings** modelled on the real ones: the R-7 launch complex (Gagarin's Start),
-  the N1 heavy complex (Site 110), the MIK assembly building, the Progress rocket plant,
-  OKB-456 engine works, an engine test stand, oxygen and propellant plants, instrument
-  works, a spacecraft hall, the Pluton tracking station, Star City, OKB-1, a recovery
-  field and two monuments.
-- **Five rockets** — R-7 Sputnik, Vostok-K, Soyuz, Proton and the N1 — built at the MIK
-  from rocket stages, engines and avionics, rolled out onto the launch pad the MIK is
-  linked to (each rocket only fits its own kind of pad), and launched by the programme:
-  the propellant and payload are taken from nearby storages, and the rocket climbs away
-  on flame and smoke — or blows up on the pad.
-- **Six new goods** — rocket stages, rocket engines, avionics, liquid oxygen, hypergolic
-  propellant and spacecraft — each made by its own industry chain.
-- **Cosmonauts: a fourth education tier.** Graduates who work at Star City join a
-  training class and become *experts* (education 3+); OKB-1 trains chief designers the
-  same way. Crewed milestones need them. The tier is a separate, reusable plugin.
-- **The programme**: eight milestones with objectives, launch success and failure, and
-  the American timeline running beside you — first is rewarded, second costs prestige.
+**THE STATE COMMISSION HAS REVIEWED THIS SITUATION AND FOUND IT IDEOLOGICALLY UNACCEPTABLE.**
 
-## Requirements
+The Ministry of General Machine Building (a name chosen so that nobody would guess what it
+builds) therefore presents the **Space Race**: a mod that turns your republic into a
+spacefaring power, one satellite, cosmonaut and extremely large explosion at a time.
 
-- Workers & Resources: Soviet Republic **1.1.1.9** (the plugins patch this exact build).
+The objective is simple: **put a Soviet cosmonaut on the Moon before 20 July 1969.** The
+Americans have a head start, a larger budget and Apollo 11. You have kerosene, liquid
+oxygen and a Five-Year Plan.
+
+The programme stays asleep until you research the *Rocket Research Institute*, so it
+waits politely in any ordinary republic. An Early Start (1920) game reaches it by the
+1950s, which is plenty of time if the cement works cooperate.
+
+> **Status: under construction, like most of the republic.** Every feature below has run
+> in the game, but nobody has played the full race yet. `mod/plugins/spacerace/spacerace.ini`
+> ships with `test_mode = 1` (space research at 5 % of its cost) so that the testers could
+> reach the Moon before retirement. Set it to `0` for a real Five-Year Plan.
+
+## WHAT THE STATE HAS APPROVED
+
+- **A space branch in the research tree.** 17 entries from 1946 to 1966, hanging off
+  *Advanced Engineering Study* and *Electronic Circuits*. Each unlocks its buildings; none
+  of them unlocks a holiday.
+- **16 buildings modelled on the real ones.**
+  - Launch: the R-7 launch complex (Gagarin's Start), the N1 heavy complex (Site 110) and
+    the MIK assembly building.
+  - Rockets and parts: the Progress rocket plant, the OKB-456 engine works, an engine test
+    stand, oxygen and propellant plants, instrument works and a spacecraft hall.
+  - Flight and crew: the Pluton tracking station, Star City, OKB-1 and a recovery field.
+  - Two monuments, so the republic can admire itself.
+- **Five rockets:** R-7 Sputnik, Vostok-K, Soyuz, Proton and the N1. The MIK builds them from
+  rocket stages, engines and avionics, then rolls them out onto the pad it is linked to.
+  The N1 needs the heavy complex; the others launch from Gagarin's Start. No amount of
+  pushing will fit an N1 onto an R-7 pad.
+- **Six new goods,** each with its own industry chain: rocket stages, rocket engines,
+  avionics, liquid oxygen, hypergolic propellant and spacecraft. The truck drivers have
+  been briefed and sworn to secrecy.
+- **Cosmonauts: a fourth education tier.** Graduates aged 23 to 35 in good health who work at
+  Star City join a class of 40. After about a year they come out as *experts*
+  (education 3+). OKB-1 turns engineers aged 30 to 65 into chief designers the same way,
+  at two years a tier, because designing takes longer than flying. Crewed flights will
+  not leave without cosmonauts. The tier is a separate plugin that other mods can reuse,
+  in case other ministries also want experts.
+- **The programme:** eight milestones raced against the real American timeline. Getting
+  there first pays in dollars, loyalty and prestige. Coming second costs prestige.
+  Whenever the Americans get somewhere first, a notification tells you so.
+
+## THE EIGHT-POINT PLAN
+
+| # | Milestone | Rocket | The Americans get there |
+|---|---|---|---|
+| 1 | The first satellite | R-7 Sputnik | January 1958 (Explorer 1) |
+| 2 | A passenger in orbit | R-7 Sputnik | January 1961 (Ham the chimpanzee) |
+| 3 | To the Moon | Vostok-K | April 1962 (Ranger 4) |
+| 4 | The first man in space | Vostok-K | February 1962 (John Glenn) |
+| 5 | A walk in space | Soyuz | June 1965 (Ed White) |
+| 6 | Rendezvous and docking | Soyuz | March 1966 (Gemini 8) |
+| 7 | Around the Moon | Proton | December 1968 (Apollo 8) |
+| 8 | A Soviet footprint on the Moon | N1 | **20 July 1969 (Apollo 11)** |
+
+Historically, the Soviet Union got to six of these eight first. The Central Committee
+has reviewed that result and expects eight.
+
+## LAUNCH PROCEDURE
+
+*As approved by the State Commission, in triplicate:*
+
+1. **Research the milestone.**
+2. **Build the rocket at the MIK.** It rolls out onto the MIK's launch pad by itself.
+3. **Stock the fuel and payload in storage buildings within 450 m of the pad.** That
+   means kerosene, liquid oxygen, the spacecraft and, for anyone breathing, food.
+   The Proton burns hypergolic propellant instead, which is exactly as pleasant as it
+   sounds.
+4. **Staff the flight.** Crewed milestones need trained cosmonauts, and from the Moon
+   probe onwards up to three tracking stations must follow the flight.
+5. **Stand well back.**
+
+The programme takes the fuel and payload from those buildings, and the rocket climbs away
+on a column of flame and smoke.
+
+Or it doesn't.
+
+### When it doesn't
+
+- **The odds.** Every launch can fail. The chance drops by 5 % for each earlier success of
+  the same rocket, and by another 10 % once the republic has an engine test stand. It never
+  goes below 5 %, because space is hard.
+- **The N1.** It starts at 70 %. Research the NK-33 engines, or keep the fire brigade
+  on speed dial.
+- **The aftermath.** A failure destroys the rocket and sets the pad on fire, so send the
+  fire brigade. In a game with building fires switched off, the pad closes for 30 days of
+  repairs instead.
+- **The press.** Either way, TASS will not be mentioning it.
+
+## NOT INCLUDED
+
+- No Americans on the map. They exist only as notifications, which is how the Politburo
+  prefers them.
+- No orbital mechanics. The rocket goes up; space takes it from there.
+- No promise that the N1 flies. The real one launched four times and exploded four times.
+- No switching an existing republic over. See *Saves* below.
+
+## REQUIREMENTS
+
+- Workers & Resources: Soviet Republic **1.1.1.9**. The plugins patch this exact build and
+  will not recognise any other.
 - [Republic Mod Loader](https://steamcommunity.com/sharedfiles/filedetails/?id=3787969749)
   (RML), which hosts the plugins.
 - To build: Windows, Visual Studio Build Tools (MSVC x64, Windows 10/11 SDK) and PowerShell.
 - To regenerate the models, textures and scripts: Python 3 with `numpy` and `pillow`,
-  and Blender 5.2 (`tools/build_space.py`). `capstone` is needed only by the
-  reverse-engineering helpers in `tools/`.
+  and Blender 5.2 (`tools/build_space.py`). Only the reverse-engineering helpers in
+  `tools/` need `capstone`.
 
-**Saves:** the new goods change the save format. A game started with this mod needs it
-to load, and games started without it will not load with it.
+**Saves:** the new goods change the save format. A republic started with this mod needs it
+to load, and republics started without it will not load with it. The Party recommends a
+fresh start, and a backup, like the Party always does.
 
-## Build and install
+## BUILD AND INSTALL
 
 ```powershell
 .\build.ps1 -Install            # compile the plugins, then deploy into the game
@@ -58,14 +139,15 @@ This installs seven local development items into `media_soviet\workshop_wip`:
 
 | Item | What |
 |---|---|
-| 9000100 | *Space Race* package: the `spacerace`, `experts` and `resources` plugins |
+| 9000100 | the *Space Race* package: the `spacerace`, `experts` and `resources` plugins |
 | 9000101 | the building kit |
-| 9000111–9000115 | the five rockets |
+| 9000111 to 9000115 | the five rockets |
 
-Close the game and the loader before installing. Then open Republic Mod Loader, enable
-those development items and the Space Race plugins, and launch.
+Close the game and the loader before installing. The installer will not requisition files
+that are still in use. Then open Republic Mod Loader, enable those development items
+and the Space Race plugins, and launch.
 
-## Rebuilding the content
+## REBUILDING THE CONTENT
 
 The research icons and the programme's window images are cut from the Blender renders,
 so run `build_space.py` first (it leaves them in `build/space` and `build/space_vehicles`):
@@ -82,7 +164,7 @@ python tools/port_resources.py         # re-ports the TesmioLoader resources plu
 
 Set `BLENDER` and `WRSR_GAME` if Blender or the game are not in their default folders.
 
-## Repository layout
+## REPOSITORY LAYOUT
 
 ```
 mod/plugins/spacerace/   research branch, programme autostart, launches, pad rules, goods for scripts
@@ -97,10 +179,10 @@ docs/                    the design document, including what was verified in gam
 vendor/TesmioLoader/     the loader API headers and the resources plugin source it was ported from
 ```
 
-`docs/space-race-design.md` is the long version: the design, every engine address the
-plugins rely on, and the test history.
+`docs/space-race-design.md` is the long version, classified only in spirit. It covers the
+design, every engine address the plugins rely on and the full test history.
 
-## Branches
+## BRANCHES
 
 | Branch | What | How changes get in |
 |---|---|---|
@@ -108,14 +190,34 @@ plugins rely on, and the test history.
 | `dev` | the next release, tested in game | pull request from `unstable`, approved by two maintainers |
 | `main` | releases | pull request from `dev`, approved by @aislanfoina (code owner) |
 
-`dev` and `main` are protected: no direct pushes, force pushes or deletions.
+`dev` and `main` are protected: no direct pushes, force pushes or deletions. Nothing
+reaches `main` without the Chief Designer's signature.
 
-## Licence and credits
+## REPORTING A LAUNCH FAILURE
 
-GPL-3.0 — see `LICENSE`. The resources plugin is a port of the one in
-[TesmioLoader](vendor/TesmioLoader), and every plugin builds against its GPL-3.0 API
-headers, so the whole repository uses the same licence.
+If something exploded that was not supposed to, open an issue with:
+- what happened;
+- what you were doing when it happened;
+- the Republic Mod Loader log.
 
-Workers & Resources: Soviet Republic is © 3Division. This mod contains none of the
-game's files; its models, textures and scripts are generated by the tools in this
-repository.
+Unlike TASS, we want to hear about failures.
+
+## LICENCE AND CREDITS
+
+GPL-3.0; see `LICENSE`. The resources plugin is a port of the one in
+[TesmioLoader](https://github.com/MaxLegend/TesmioLoader) by MaxLegend. Every plugin builds
+against its GPL-3.0 API headers, so the whole repository uses the same licence. The plugins
+run on [Republic Mod Loader](https://github.com/Ultimate-Universe/WRSR-RepublicModLoader) by
+UltimateUniverse, whose Workshop pages also inspired the tone of this README.
+
+Workers & Resources: Soviet Republic is © 3Division. This is an independent fan-made mod,
+not affiliated with or endorsed by 3Division or Hooded Horse. It contains none of the game's
+files; its models, textures and scripts are generated by the tools in this repository.
+
+If the programme has served the republic, give the repository a star. The space programme
+needs all the stars it can get.
+
+---
+
+**Build the rockets. Train the cosmonauts. Beat Apollo 11.**
+**The Motherland is watching, Comrade, and so, unfortunately, are the Americans.**
