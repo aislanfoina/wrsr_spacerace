@@ -1,7 +1,7 @@
 """Build every Space Race asset: textures, the building kit, the rockets, previews.
 
     python tools/build_space.py              # textures kit vehicles previews
-    python tools/build_space.py kit          # one or more stages: textures | kit | vehicles | previews | research | deploy
+    python tools/build_space.py kit          # one or more stages: textures | kit | inis | vehicles | previews | research | programme | deploy
     python tools/build_space.py kit pad_r7   # kit stage for some buildings only (comma separated keys)
 
 deploy copies the items into the game's workshop_wip (same as build_madmax.py);
@@ -37,6 +37,11 @@ def stage_textures(_=None):
 
 def stage_kit(only=None):
     run([BLENDER, '-b', '--python', 'tools/space_scene.py', '--', TEX, KIT, 'build/space'] + ([only] if only else []))
+
+
+def stage_inis(only=None):
+    """Only the kit's building files, stand-in and new-goods variants (no models, no renders)."""
+    run([BLENDER, '-b', '--python', 'tools/space_scene.py', '--', TEX, KIT, 'build/space', only or '', 'inis'])
 
 
 def stage_vehicles(_=None):
@@ -88,6 +93,12 @@ def stage_research(_=None):
     run([PY, 'tools/space_research.py'])
 
 
+def stage_programme(_=None):
+    """The programme template and launches.ini, then the balance settings drawn from everything."""
+    run([PY, 'tools/space_scenario.py'])
+    run([PY, 'tools/space_settings.py'])
+
+
 def stage_deploy(_=None):
     items = [os.path.join(ROOT, KIT)] + [os.path.join(ROOT, 'mod/vehicles', k) for k in ROCKETS]
     for src in items:
@@ -103,8 +114,8 @@ def stage_deploy(_=None):
         print('deployed %s -> %s' % (os.path.relpath(src, ROOT), dst))
 
 
-STAGES = {'textures': stage_textures, 'kit': stage_kit, 'vehicles': stage_vehicles, 'previews': stage_previews,
-          'research': stage_research, 'deploy': stage_deploy}
+STAGES = {'textures': stage_textures, 'kit': stage_kit, 'inis': stage_inis, 'vehicles': stage_vehicles, 'previews': stage_previews,
+          'research': stage_research, 'programme': stage_programme, 'deploy': stage_deploy}
 
 if __name__ == '__main__':
     args = sys.argv[1:]

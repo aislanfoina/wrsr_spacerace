@@ -738,6 +738,78 @@ for space food, and plastics for heat shields.
   Proton 70 and N1 180, so they cost 90,818₽ to 217,355₽ and more. The N1 pad's
   construction cost is cut to a quarter.
 
+### Settings and the goods switch (2026-09-30, built, tested offline and in game)
+
+Every balance number moved into `spacerace.ini` (generated below a marker by
+`tools/space_settings.py`, with `data/defaults.ini` as the fallback the plugin reads first):
+`[research]` years and costs (+ `year_shift`, `cost_scale`), `[america]` dates (`YYYY-MM-DD` or
+`never`, + `year_shift`), `[milestones]` failure / crew / tracking, `[rockets]` loads,
+`[rocket_parts]` MIK bills, `[launches]` radius / park distance / climb / repair days / failure
+modifiers, `[rewards]` money and loyalty, `[buildings]` `cost_scale` and `[building:<object>]`
+cost (`auto` or absolute amounts with workers = workdays), `cost_scale`, workers, educated,
+production, consumption. The dead `prestige` counter is gone.
+
+How each reaches the game:
+- **Research** - `ResearchSettings()` rewrites `$YEAR` / `$COST` while the merged research.ini is
+  built (before test mode's filter).
+- **Buildings** - the building-type loader opens every `building.ini` through SOVIET64's `fopen`
+  import (call at 0x10E37E in 0x10E1F0, just before its "Failed to open %s"), the same import the
+  research merge swaps. `DetourFopen` recognises `...\<kit_item>\sr_*\building.ini` and serves
+  `spacerace_data\buildings\<object>.ini`, patched: absolute costs become groundworks (asphalt,
+  gravel) / skeleton casting (everything else, workdays) / steel laying phases, each with
+  `$COST_WORK_BUILDING_ALL`.
+- **Programme** - `data/programme/race.tmpl` has 114 `@tokens@` (listed in `milestones.txt`);
+  the plugin renders it at start into `scenarios\spacerace\race_<fnv>\` with `rules.ini`
+  (radius and loads) and starts that mission in new games. A save keeps its running script, so a
+  republic keeps the rules it began with; the plugin never deletes a mission it wrote. On every
+  world load `ApplyRules()` reads the running mission's `rules.ini` (a legacy mission without one
+  gets launches.ini's loads). The old `race` mission is frozen in `legacy/race`.
+- Tracking stations and test stands are recognised by the script through their staff numbers,
+  so those two buildings' `workers` / `educated` also feed the template.
+
+**`new_goods`** (`[general]`, default 0). The kit's `building.ini` on disk now uses vanilla
+stand-ins (space_scene.py writes every building twice; a stand-in factory drops an input that
+became its own output, and the oxygen plant takes mechanical components); the new-goods variant
+is `data/goods_buildings/sr_<key>.ini`, which the plugin serves with `new_goods = 1`. With 0 the
+resources plugin adds nothing (it reads `spacerace.ini` beside it), launch loads are mapped through
+launches.ini's `standin` lines, the MIK keeps the engine's weight-based bill, the ResourceField
+hook is not installed, and the programme reads `res.chemicals` / `res.eletronics`. The two modes
+render different missions.
+
+Checked offline with a harness that compiles spacerace.cpp against a stub host
+(scratch `sr_harness.cpp` / `sr_test.py`): with default settings the plugin's render is
+byte-identical to `build/space_programme_default_goods0/1.txt` and all 16 buildings come out
+unchanged in both modes; edited settings reach every token, file and rules line.
+
+**In game, 2026-09-30 (Claude, user away):**
+- Start-up in both modes: settings read, research merged, `race_d874e562` (stand-ins) and
+  `race_710a135c` (new goods) rendered byte-identical to the Python renders; all 16 kit
+  buildings served patched when the types load (with a world, not at the menu).
+- An existing save (26063, running the frozen `race`) loads with the new build; its programme
+  keeps launches.ini's rules. New games on "Flatland with hills" auto-start the rendered mission,
+  the script compiles, `rules.ini` is applied.
+- `log.html` noise that is the base game's: `ResourceGet - not found waste` (fertiliser and
+  incinerator inis name a resource `waste`), `Read error (8)` on `replace_history.bin` /
+  `usedveh.bin` (every save, fresh ones too).
+- **Construction costs** live in the building type: phases at type+0x370/+0x378 (records of
+  0x21B8 bytes), each with a std::vector of {Resource*, float, pad} - auto costs resolved into
+  real goods (ground works: workdays, concrete, gravel, asphalt; casting: workdays, concrete,
+  steel, bricks, boards; steel laying: workdays, steel, mechanical components).
+  `build/costdump.py kit` reads them from a running game; its totals are
+  `tools/space_kit_costs.txt`, now the absolute `cost =` defaults (read back in game after the
+  switch: within 0.01 %).
+- **Saves and the goods** (matched fresh saves of the same map, then loads both ways):
+  `stats.ini`'s per-resource sections are by name and `$end`-terminated (unknown names are
+  skipped with "ResourceGet - not found"); the only other difference was customhouse trade state.
+  A plain save loads with `new_goods = 1` and saves fine - the goods simply join. A new-goods save
+  loads with `new_goods = 0`, but **the save writer crashes (0xC0000005)** on a warehouse slot
+  whose good was not found. Fix: with `new_goods = 0` the resources plugin hooks only ResourceGet
+  and answers the six names with their stand-ins' records (`standin` lines); the new-goods world
+  (autosave from the Track B test) then loads and saves as a clean plain save (no new-goods name
+  left in it). No converter tool needed for the goods.
+- Not tested: a save loaded with the plugins switched off in RML altogether (the scenario, the
+  space research entries and the kit buildings would remain in it).
+
 ### Pending: showing the experts in game (done in the launch-sequence programme)
 
 Before it, cosmonauts showed only in `rml-runtime.log` ("N experts in the republic", "promoted") and as
