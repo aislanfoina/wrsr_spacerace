@@ -1,0 +1,19 @@
+# Construction cost of every kit building as the game computes it from the kit's auto costs (workdays and tonnes),
+# read from a running game on 2026-09-30 with: python build/costdump.py kit   (cost = auto for all of them).
+# tools/space_settings.py makes these the absolute cost defaults in spacerace.ini.
+9000101/sr_bureau          workers 10779, asphalt 106, boards 95, bricks 285, concrete 1042, gravel 132, mcomponents 11, steel 287
+9000101/sr_engine_plant    workers 34181, asphalt 533, boards 138, bricks 413, concrete 2886, gravel 666, mcomponents 75, steel 870
+9000101/sr_gagarin         workers 1002, asphalt 13, concrete 145, gravel 17, mcomponents 1, steel 35
+9000101/sr_instruments     workers 17498, asphalt 320, boards 66, bricks 199, concrete 1496, gravel 401, mcomponents 35, steel 413
+9000101/sr_lox_plant       workers 17951, asphalt 298, boards 77, bricks 230, concrete 1610, gravel 372, mcomponents 34, steel 446
+9000101/sr_mik             workers 61396, asphalt 834, concrete 6607, gravel 1043, mcomponents 161, steel 1966
+9000101/sr_monument        workers 12243, asphalt 86, concrete 1643, gravel 108, mcomponents 28, steel 475
+9000101/sr_pad_n1          workers 203149, asphalt 1012, concrete 19284, gravel 1265, mcomponents 765, steel 7679
+9000101/sr_pad_r7          workers 92167, asphalt 838, concrete 9972, gravel 1047, mcomponents 274, steel 3274
+9000101/sr_propellant      workers 19408, asphalt 332, boards 76, bricks 227, concrete 1650, gravel 415, mcomponents 40, steel 474
+9000101/sr_recovery        workers 11944, asphalt 246, concrete 1333, gravel 307, mcomponents 23, steel 321
+9000101/sr_rocket_plant    workers 65528, asphalt 1042, boards 244, bricks 732, concrete 5270, gravel 1302, mcomponents 156, steel 1653
+9000101/sr_spacecraft      workers 15488, asphalt 264, boards 63, bricks 188, concrete 1349, gravel 330, mcomponents 31, steel 379
+9000101/sr_test_stand      workers 46488, asphalt 387, boards 215, bricks 645, concrete 3783, gravel 484, mcomponents 128, steel 1410
+9000101/sr_tracking        workers 16245, asphalt 161, concrete 1464, gravel 201, mcomponents 57, steel 547
+9000101/sr_training        workers 18253, asphalt 297, boards 130, bricks 389, concrete 1672, gravel 371, mcomponents 20, steel 416

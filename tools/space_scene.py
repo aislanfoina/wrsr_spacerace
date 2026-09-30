@@ -20,10 +20,15 @@ Every model follows a real site (dimensions in metres, simplified):
     monument      the Monument to the Conquerors of Space (107 m)
     gagarin       the Gagarin column
 
-Building definitions are provisional: the Track B goods (lox, hypergolic,
-rocket_engine, rocket_stage, avionics, spacecraft...) are written as they will
-be, and swapped for vanilla stand-ins while USE_NEW_GOODS is False, so the kit
-loads before the resources plugin exists.
+Every building is written twice. building.ini uses vanilla stand-ins for the six
+new goods (lox and hypergolic propellant as chemicals, rocket parts as mechanical
+components, avionics and spacecraft as electronics), so the kit loads in any save
+and without the plugins. mod/plugins/spacerace/data/goods_buildings/sr_<key>.ini
+has the new goods; the spacerace plugin serves it in place of building.ini when
+spacerace.ini says new_goods = 1.
+
+    blender -b --python tools/space_scene.py -- <texdir> <kitdir> <previewdir> "" inis
+writes only those building files (no models, no renders).
 """
 import math
 import os
@@ -47,8 +52,11 @@ TEXDIR = argv[0] if len(argv) > 0 else 'build/space_textures'
 KITDIR = argv[1] if len(argv) > 1 else 'mod/buildings/space_kit'
 PREVIEW = argv[2] if len(argv) > 2 else 'build/space'
 ONLY = set(argv[3].split(',')) if len(argv) > 3 and argv[3] else None
+INIS_ONLY = len(argv) > 4 and argv[4] == 'inis'
 ITEM_ID = 9000101
-from space_goods import USE_NEW_GOODS, CLASS, good  # noqa: E402,F401  (shared with space_scenario.py)
+import space_goods as G  # noqa: E402  (shared with space_scenario.py; G.USE_NEW_GOODS picks the variant being written)
+from space_goods import CLASS, good  # noqa: E402
+GOODS_INIS = os.path.join(os.path.dirname(TOOLS), 'mod', 'plugins', 'spacerace', 'data', 'goods_buildings')
 
 
 # =================================================================== pads ==
@@ -578,8 +586,26 @@ def stations(xs, z0, z1):
     return ['$VEHICLE_STATION %.1f %.2f %.1f  %.1f %.2f %.1f' % (x, PODIUM, z0, x, PODIUM, z1) for x in xs] + ['']
 
 
-def factory(name, workers, profs, prod, cons, zf, half_x, half_z, st_xs, st_z0, st_z1, extra=(), power=0.4, desc=''):
-    """prod/cons: lists of (good, t/worker-day). Storages follow the goods' transport class."""
+def merged(pairs):
+    """(design good, rate) -> (game good, rate), goods that map to the same game good added up."""
+    out = []
+    for g, r in pairs:
+        gg = good(g)
+        for i, (h, s) in enumerate(out):
+            if h == gg:
+                out[i] = (h, s + r)
+                break
+        else:
+            out.append((gg, r))
+    return out
+
+
+def factory(name, workers, profs, prod, cons, zf, half_x, half_z, st_xs, st_z0, st_z1, extra=(), power=0.4, desc='',
+            standin_cons=None):
+    """prod/cons: lists of (good, t/worker-day). Storages follow the goods' transport class.
+    With vanilla stand-ins an input can turn into the output (rocket engines and the parts made from
+    them are both mechanical components): such inputs are dropped, and standin_cons replaces cons
+    where nothing would be left."""
     lines = ['$NAME_STR "%s"' % name, '']
     if desc:
         lines += ['; ' + desc, '']
@@ -587,13 +613,18 @@ def factory(name, workers, profs, prod, cons, zf, half_x, half_z, st_xs, st_z0, 
     lines += ['$TYPE_FACTORY', '$WORKERS_NEEDED %d' % workers]
     if profs:
         lines.append('$PROFESORS_NEEDED %d' % profs)
-    for g, r in prod:
-        lines.append('$PRODUCTION %s %.4f' % (good(g), r))
-    for g, r in cons:
-        lines.append('$CONSUMPTION %s %.4f' % (good(g), r))
+    prod_g = merged(prod)
+    outs = [g for g, _ in prod_g]
+    cons_g = merged(cons if G.USE_NEW_GOODS or not standin_cons else standin_cons)
+    if not G.USE_NEW_GOODS:
+        cons_g = [(g, r) for g, r in cons_g if g not in outs]
+    assert cons_g, '%s uses nothing with %s goods' % (name, 'new' if G.USE_NEW_GOODS else 'stand-in')
+    for g, r in prod_g:
+        lines.append('$PRODUCTION %s %.4f' % (g, r))
+    for g, r in cons_g:
+        lines.append('$CONSUMPTION %s %.4f' % (g, r))
     lines.append('$CONSUMPTION_PER_SECOND eletric %.2f' % power)
-    ins = sorted({good(g) for g, _ in cons}, key=lambda x: [good(c) for c, _ in cons].index(x))
-    outs = sorted({good(g) for g, _ in prod}, key=lambda x: [good(c) for c, _ in prod].index(x))
+    ins = [g for g, _ in cons_g]
     assert not set(ins) & set(outs), '%s makes what it uses (%s) - trucks would shuttle it round in circles' % (name, set(ins) & set(outs))
     for gg in ins:
         lines.append('$STORAGE_IMPORT_SPECIAL RESOURCE_TRANSPORT_%s 40 %s' % (CLASS.get(gg, 'COVERED'), gg))
@@ -651,7 +682,7 @@ def ini_mik(name, desc):
     lines = ['$NAME_STR "%s"' % name, '', '; ' + desc, ''] + cost(0.8, 1.6, 1.0) + [
         '$TYPE_PRODUCTION_LINE', '$SUBTYPE_AIRPLANE', '$WORKERS_NEEDED 200', '$PROFESORS_NEEDED 100',
         '$ELETRIC_CONSUMPTION_LIVING_WORKER_FACTOR 6.0', '$WASTE_PRODUCTION_DISABLE']
-    if USE_NEW_GOODS:
+    if G.USE_NEW_GOODS:
         # the spacerace plugin replaces each rocket's bill with these (space_goods.BILL)
         parts = ('rocket_stage', 'rocket_engine', 'avionics')
         lines += ['$STORAGE_IMPORT_SPECIAL RESOURCE_TRANSPORT_%s 150 %s' % (CLASS[g], g) for g in parts]
@@ -706,9 +737,11 @@ INIS = {
                                        'While a test stand is working, launches fail less often.'),
     # oxygen comes from the air: power, and a trickle of chemicals for the intake driers (vanilla water
     # arrives only by pipe, and this plant has none; no vanilla factory runs without any input)
+    # (with stand-in goods its oxygen is chemicals, so the driers take spare parts instead)
     'lox_plant': lambda: factory('Oxygen-Nitrogen Plant', 60, 20, [('lox', 0.06)], [('chemicals', 0.002)],
                                  40, 50, 40, (16.0, 20.0), 20.0, 38.0, power=4.0,
-                                 desc='Liquid oxygen boils off: build it close to the pad and fill just before a launch.'),
+                                 desc='Liquid oxygen boils off: build it close to the pad and fill just before a launch.',
+                                 standin_cons=[('mcomponents', 0.002)]),
     'propellant': lambda: factory('Propellant Plant (UDMH / N2O4)', 90, 30, [('hypergolic', 0.03)],
                                   [('chemicals', 0.02), ('fuel', 0.015)], 45, 55, 45, (-6.0, -2.0, 2.0), 22.0, 43.0,
                                   extra=['$POLLUTION_HIGH'], desc='Toxic hypergolic propellants for Proton and upper stages. Accidents happen.'),
@@ -780,7 +813,26 @@ def view(bbox, az, el, fill, ty):
     return (pos[0], pos[1] + dy, pos[2]), (tgt[0], ty, tgt[2])
 
 
+def write_inis(key, adir):
+    """building.ini with vanilla stand-ins, and the new-goods variant for the spacerace plugin."""
+    saved = G.USE_NEW_GOODS
+    try:
+        G.USE_NEW_GOODS = False
+        mmkit.write_text(os.path.join(adir, 'building.ini'), INIS[key]())
+        G.USE_NEW_GOODS = True
+        os.makedirs(GOODS_INIS, exist_ok=True)
+        mmkit.write_text(os.path.join(GOODS_INIS, 'sr_%s.ini' % key), INIS[key]())
+    finally:
+        G.USE_NEW_GOODS = saved
+
+
 def main():
+    if INIS_ONLY:
+        for key, _fn in ASSETS:
+            if not ONLY or key in ONLY:
+                write_inis(key, os.path.join(KITDIR, 'sr_' + key))
+        print('building files (stand-in and new goods) written for %d buildings' % len(ASSETS))
+        return
     mmkit.clear_scene()
     os.makedirs(KITDIR, exist_ok=True)
     os.makedirs(PREVIEW, exist_ok=True)
@@ -810,7 +862,7 @@ def main():
         bbox = mmkit.model_bbox(shapes)
         mmkit.write_bbox_file(os.path.join(adir, 'building.bbox'), shapes)
         mmkit.write_fire_file(os.path.join(adir, 'building.fire'), b.fire)
-        mmkit.write_text(os.path.join(adir, 'building.ini'), INIS[key]())
+        write_inis(key, adir)
         mmkit.write_text(os.path.join(adir, 'renderconfig.ini'), RENDERCONFIG % {'n': 'sr_' + key})
         mmkit.write_text(os.path.join(matdir, 'sr_%s.mtl' % key), mtl(used))
         mmkit.write_text(os.path.join(matdir, 'sr_%s_e.mtl' % key), mtl(used, emissive=True))

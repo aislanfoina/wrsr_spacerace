@@ -8,3 +8,7 @@ folder in legacy/ into the scenario next to the new mission.
 
   programme/   the 2026-09-29 programme (1,559 lines, returnVoid fix): the first
                in-game Sputnik launch ran on it. Superseded by race/.
+  race/        the 2026-09-30 programme (Track B goods, cosmonaut objective, pad
+               closure without fires). Superseded by the settings-driven
+               programme: the plugin now renders data/programme/race.tmpl with
+               spacerace.ini into race_<hash>/ missions of its own.

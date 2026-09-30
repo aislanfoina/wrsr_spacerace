@@ -3,28 +3,34 @@ any ordinary game, gated by the space research branch.
 
     python tools/space_scenario.py
 
-Writes mod/plugins/spacerace/data/scenarios/spacerace/ (the plugin copies it into
-media_soviet/scenarios/spacerace at start):
-    script.ini                    scenario header
-    programme/script.ini          the only mission; it runs the whole race
-    programme/programme.txt       the VM script (generated below)
+Writes mod/plugins/spacerace/data/ (the plugin ships that folder):
+    programme/race.tmpl           the VM script as a template: every number a player may change
+                                  is an @token@ the plugin fills in from spacerace.ini
+    programme/milestones.txt      the milestones in template order and the rocket each one flies
+    programme/script.ini          the mission header every rendered programme gets
     programme/*.png               window images, from the kit's renders
+    scenarios/spacerace/          the scenario header and the frozen legacy missions (legacy/)
+    launches.ini                  pads, effects, script goods, stand-ins, default loads and rocket bills
+and build/space_programme_default_goods0.txt / _goods1.txt, the template rendered with the defaults
+for vanilla stand-in goods and for the new goods (checked by tools/vmcheck.py; the plugin's own
+rendering of unchanged settings should match the one for its new_goods).
 
-How it plays: the script sleeps until the Rocket Research Institute is
-researched, then walks the milestones in order. Each milestone waits for its
-research, a rocket of the right type parked on a launch pad (a heliport-type
-building it is assigned to), propellant and payload in storages within 450 m
-of the pad, cosmonauts (experts, education >= 3) and tracking stations. Then it
-launches: the goods are consumed, a failure roll decides (it falls with every
-success of that rocket; the N1 needs the NK-33 research), a failure burns the
-pad. The American timeline runs beside it by date; being first pays in dollars
-and loyalty, being second costs prestige. The last milestone is the N1 landing
-on the Moon: win it before 20 July 1969 and the race is won.
+The plugin renders the template at start-up into scenarios/spacerace/race_<hash>/, a mission of
+its own for every set of settings: a save keeps the running programme's state, so a game keeps
+the rules it began with while new games take the current ones.
 
-Rockets are recognised by their engine power (9001..9005 kW, set in
-space_vehicles.py) because the VM's Vehicle struct has no type name.
-Goods: while the resources plugin is not in, lox and hypergolics are counted as
-chemicals and spacecraft as eletronics (FIELD below).
+How it plays: the script sleeps until the Rocket Research Institute is researched, then walks
+the milestones in order. Each milestone waits for its research, a rocket of the right type
+parked on a launch pad (a heliport-type building it is assigned to), propellant and payload in
+storages near the pad, cosmonauts (experts, education >= 3) and tracking stations. Then it
+launches: the goods are consumed, a failure roll decides (it falls with every success of that
+rocket; the N1 needs the NK-33 research), a failure burns the pad. The American timeline runs
+beside it by date; being first pays in dollars and loyalty, the Americans getting there first
+costs loyalty. The last milestone is the N1 landing on the Moon.
+
+Rockets are recognised by their engine power (9001..9005 kW, set in space_vehicles.py) because
+the VM's Vehicle struct has no type name. Tracking stations and engine test stands are
+recognised by their staff numbers, so those come from the buildings' settings.
 """
 import os
 import shutil
@@ -34,69 +40,93 @@ import sys
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, 'mod', 'plugins', 'spacerace', 'data', 'scenarios', 'spacerace')
+DATA = os.path.join(ROOT, 'mod', 'plugins', 'spacerace', 'data')
+OUT = os.path.join(DATA, 'scenarios', 'spacerace')
+PROG = os.path.join(DATA, 'programme')
+DEFAULT_RENDER = os.path.join(ROOT, 'build', 'space_programme_default_goods%d.txt')   # new_goods 0 / 1
+KIT = os.path.join(ROOT, 'mod', 'buildings', 'space_kit')
 import space_goods as G  # noqa: E402  (the goods, shared with space_scene.py)
 # design goods a launch uses -> the game good and the script field that reads it
 LOAD_KEYS = (('fuel', 'fuel'), ('lox', 'lox'), ('hyper', 'hypergolic'), ('craft', 'spacecraft'), ('food', 'space_food'))
-FIELD = {k: G.field(g) for k, g in LOAD_KEYS}
-GOOD = {k: G.good(g) for k, g in LOAD_KEYS}
-RADIUS = 450.0
-# the mission folder new games run. A save keeps the running programme's state, so a mission that
-# saves already use never changes: a rewrite gets a new folder, and the old one lives on frozen in
-# mod/plugins/spacerace/legacy/ (copied in beside it). 'programme' ran the first in-game launch.
-MISSION = 'race'
+GOOD = {k: G.good(g) for k, g in LOAD_KEYS}          # the new goods' names; the plugin maps them to stand-ins
+# Saves that run an older programme keep it: every mission they may run lives on, frozen, in
+# mod/plugins/spacerace/legacy/ and is copied in beside the rendered ones.
 LEGACY = os.path.join(ROOT, 'mod', 'plugins', 'spacerace', 'legacy')
+
+# ------------------------------------------------------------ settings defaults
+# spacerace.ini [launches] and [rewards] (tools/space_settings.py writes them out with these notes)
+LAUNCHES = [
+    ('radius', 450, 'storage buildings this close to the pad supply a launch (m)'),
+    ('park_distance', 90, 'a rocket counts as standing on its pad this close to it (m)'),
+    ('climb_seconds', 18, 'how long a rocket climbs before it leaves the map (s)'),
+    ('pad_repair_days', 30, 'a failed launch closes the pad this long in games without building fires'),
+    ('failure_per_success', 5, 'each earlier success of the same rocket lowers its failure chance (%)'),
+    ('failure_test_stand', 10, 'an engine test stand anywhere in the republic lowers every failure chance (%)'),
+    ('failure_nk33', 35, 'the NK-33 research lowers the N1\'s failure chance (%)'),
+    ('failure_min', 5, 'no launch is ever safer than this (% failure)'),
+]
+REWARDS = [
+    ('first_money', 25000, 'USD for reaching a milestone before the Americans'),
+    ('first_loyalty', 12, 'loyalty for every citizen then (%)'),
+    ('second_money', 5000, 'USD for reaching it after them'),
+    ('second_loyalty', 3, 'loyalty then (%)'),
+    ('america_first_loyalty', -5, 'loyalty when the Americans reach a milestone first (%)'),
+    ('victory_money', 100000, 'USD for the Moon before the Americans'),
+    ('victory_loyalty', 20, 'loyalty then (%)'),
+]
+L = dict((k, v) for k, v, _ in LAUNCHES)
+R = dict((k, v) for k, v, _ in REWARDS)
 
 # power: 9001 Sputnik, 9002 Vostok-K, 9003 Soyuz, 9004 Proton, 9005 N1
 MILESTONES = [
     dict(key='sputnik', research='sr_satellite', power=9001, rocket='R-7 Sputnik', crew=0, track=0,
          fuel=8, lox=20, craft=1, food=0, fail=30, icon='sr_satellite',
          title='The first satellite',
-         brief='Put an artificial satellite into orbit. Park an R-7 Sputnik rocket on a launch complex, store kerosene, liquid oxygen and the satellite in buildings within 450 m of the pad, and it will fly.',
+         brief='Put an artificial satellite into orbit. Park an R-7 Sputnik rocket on a launch complex, store kerosene, liquid oxygen and the satellite in storage buildings within {radius} m of the pad, and it will fly.',
          win='Beep... beep... beep. Sputnik is in orbit and every radio on Earth can hear it. The space age has begun, and it began here.',
-         us_y=1958, us_d=31, us_text='Explorer 1 is in orbit. The Americans have their satellite.'),
+         us_date='1958-01-31', us_what='Explorer 1', us_text='Explorer 1 is in orbit. The Americans have their satellite.'),
     dict(key='laika', research='sr_biosatellite', power=9001, rocket='R-7 Sputnik', crew=0, track=0,
          fuel=8, lox=20, craft=2, food=1, fail=25, icon='sr_biosatellite',
          title='A passenger in orbit',
          brief='Send a living passenger into orbit: a satellite with life support and food for the flight. Belka and Strelka came back; Laika did not.',
          win='A living creature has orbited the Earth. Now we know a cosmonaut can survive up there.',
-         us_y=1961, us_d=31, us_text='Ham the chimpanzee has flown in an American capsule.'),
+         us_date='1961-01-31', us_what='Ham the chimpanzee', us_text='Ham the chimpanzee has flown in an American capsule.'),
     dict(key='luna', research='sr_lunar_probes', power=9002, rocket='Vostok-K', crew=0, track=1,
          fuel=10, lox=25, craft=2, food=0, fail=35, icon='sr_lunar_probes',
          title='To the Moon',
          brief='Hit the Moon with a Luna probe. The Vostok-K and its Blok E upper stage can reach escape velocity; a tracking station must follow it.',
          win='Luna has reached the Moon and left the pennant of the Soviet Union on its surface.',
-         us_y=1962, us_d=116, us_text='Ranger 4 has struck the far side of the Moon.'),
+         us_date='1962-04-26', us_what='Ranger 4', us_text='Ranger 4 has struck the far side of the Moon.'),
     dict(key='vostok', research='sr_manned_flight', power=9002, rocket='Vostok-K', crew=1, track=1,
          fuel=10, lox=25, craft=5, food=1, fail=15, icon='sr_manned_flight',
          title='The first man in space',
          brief='Put a cosmonaut into orbit and bring him back. You need a Vostok-K on the pad, the Vostok spacecraft, a trained cosmonaut (an expert from the Cosmonaut Training Centre) and a tracking station.',
          win='Poyekhali! A Soviet cosmonaut has orbited the Earth and landed safely in the steppe. The whole world knows his name.',
-         us_y=1962, us_d=51, us_text='John Glenn has orbited the Earth in Friendship 7.'),
+         us_date='1962-02-20', us_what='John Glenn', us_text='John Glenn has orbited the Earth in Friendship 7.'),
     dict(key='voskhod', research='sr_eva', power=9003, rocket='Soyuz', crew=2, track=1,
          fuel=12, lox=30, craft=6, food=1, fail=15, icon='sr_eva',
          title='A walk in space',
-         brief='Two cosmonauts, an inflatable airlock and the first walk outside a spacecraft.',
+         brief='Cosmonauts, an inflatable airlock and the first walk outside a spacecraft.',
          win='A cosmonaut has floated outside his ship for twelve minutes, and got back in.',
-         us_y=1965, us_d=154, us_text='Ed White has walked in space from Gemini 4.'),
+         us_date='1965-06-03', us_what='Ed White', us_text='Ed White has walked in space from Gemini 4.'),
     dict(key='soyuz', research='sr_soyuz', power=9003, rocket='Soyuz', crew=3, track=2,
          fuel=12, lox=30, craft=7, food=2, fail=15, icon='sr_soyuz',
          title='Rendezvous and docking',
-         brief='The Soyuz: three cosmonauts, rendezvous and docking in orbit - everything a Moon flight needs. Two tracking stations must follow it.',
+         brief='The Soyuz: a crew of cosmonauts, rendezvous and docking in orbit - everything a Moon flight needs. Tracking stations must follow it.',
          win='Two ships have met and docked in orbit. The road to the Moon is open.',
-         us_y=1966, us_d=75, us_text='Gemini 8 has docked with its Agena target.'),
+         us_date='1966-03-16', us_what='Gemini 8', us_text='Gemini 8 has docked with its Agena target.'),
     dict(key='zond', research='sr_proton', power=9004, rocket='Proton', crew=0, track=2,
          fuel=0, lox=0, hyper=60, craft=8, food=0, fail=35, icon='sr_proton',
          title='Around the Moon',
-         brief='Send a Zond spacecraft around the Moon and back on the Proton. It burns storable propellants (counted as chemicals here).',
+         brief='Send a Zond spacecraft around the Moon and back on the Proton. It burns storable hypergolic propellant.',
          win='Zond has flown round the Moon and splashed down with its tortoises alive.',
-         us_y=1968, us_d=356, us_text='Apollo 8 is in orbit around the Moon with three astronauts aboard.'),
+         us_date='1968-12-21', us_what='Apollo 8', us_text='Apollo 8 is in orbit around the Moon with three astronauts aboard.'),
     dict(key='moon', research='sr_lunar_landing', power=9005, rocket='N1-L3', crew=2, track=3,
          fuel=80, lox=200, craft=25, food=3, fail=70, icon='sr_lunar_landing',
          title='A Soviet footprint on the Moon',
-         brief='The N1 has to fly. Park it on the Heavy Launch Complex with 80 t of kerosene, 200 t of liquid oxygen and 25 t of spacecraft in reach, two cosmonauts and three tracking stations. Without the NK-33 engines most N1s explode.',
+         brief='The N1 has to fly. Park it on the Heavy Launch Complex with its kerosene, liquid oxygen and the lunar spacecraft in reach, cosmonauts ready and tracking stations to follow it. Without the NK-33 engines most N1s explode.',
          win='The LK has landed. A Soviet cosmonaut stands on the Moon.',
-         us_y=1969, us_d=201, us_text='Apollo 11 has landed on the Moon. Neil Armstrong walks on its surface.'),
+         us_date='1969-07-20', us_what='Apollo 11', us_text='Apollo 11 has landed on the Moon. Neil Armstrong walks on its surface.'),
 ]
 
 
@@ -111,8 +141,63 @@ for _m in MILESTONES:
         _l[_k] = max(_l[_k], _m[_k])
 for _m in MILESTONES:
     _m.update(LOADS[ROCKET_OF[_m['power']]])
-CLIMB_SECONDS = 18
-PAD_REPAIR_DAYS = 30    # a failed launch in a game without building fires closes the pad this long
+PAD_OF = {'sr_n1': 'sr_pad_n1'}      # every other rocket stands on the R-7 complex
+
+MONTHS = ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October',
+          'November', 'December')
+MONTH_DAYS = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+
+
+def day_of_year(date):
+    """Year and day (1-365) of a YYYY-MM-DD date in the game's 365-day calendar (Date_GetCurrentDate_D365Y);
+    the plugin does the same sum."""
+    y, m, d = (int(x) for x in date.split('-'))
+    return y, sum(MONTH_DAYS[:m - 1]) + min(d, MONTH_DAYS[m - 1])
+
+
+def date_text(date):
+    y, m, d = (int(x) for x in date.split('-'))
+    return '%d %s %d' % (d, MONTHS[m - 1], y)
+
+
+def staff(obj):
+    """(workers, educated) a kit building needs, from its generated building.ini."""
+    w = e = 0
+    for line in open(os.path.join(KIT, obj, 'building.ini'), encoding='utf-8', errors='replace'):
+        t = line.split()
+        if len(t) >= 2 and t[0] == '$WORKERS_NEEDED':
+            w = int(t[1])
+        elif len(t) >= 2 and t[0] == '$PROFESORS_NEEDED':
+            e = int(t[1])
+    return w, e
+
+
+def fmt_float(v):
+    """Floats as the plugin writes them: two decimals, a negative one as 0.0 - x (the VM has no
+    negative literals)."""
+    return '0.0 - %.2f' % -v if v < 0 else '%.2f' % v
+
+
+class Tok:
+    """The numbers a player may change. In the template they are @name@ for the plugin to fill in;
+    rendered, they are the defaults (so the script can be checked here). The plugin computes every
+    token from spacerace.ini the same way; the names are its contract with this file."""
+    def __init__(self, template):
+        self.template = template
+        self.values = {}
+
+    def _put(self, name, text):
+        assert self.values.setdefault(name, text) == text, 'token %s used with two values' % name
+        return '@%s@' % name if self.template else text
+
+    def i(self, name, v):
+        return self._put(name, '%d' % v)
+
+    def f(self, name, v):
+        return self._put(name, fmt_float(v))
+
+    def s(self, name, v):
+        return self._put(name, v)
 
 
 def research_name(key):
@@ -128,17 +213,33 @@ def esc(s):
     return s.replace('"', "'")
 
 
-def gen_script():
-    L = []
-    a = L.append
+def fields(new_goods):
+    """The Resources field the script reads each load kind from, and the payload's good, with the
+    six new goods (spacerace.ini new_goods = 1) or their vanilla stand-ins (0)."""
+    saved = G.USE_NEW_GOODS
+    G.USE_NEW_GOODS = new_goods
+    try:
+        return {k: G.field(g) for k, g in LOAD_KEYS}, G.good('spacecraft')
+    finally:
+        G.USE_NEW_GOODS = saved
+
+
+def gen_script(t, new_goods=False):
+    field, craft_good = fields(new_goods)
+    stand_w, stand_e = staff('sr_test_stand')
+    track_w, track_e = staff('sr_tracking')
+    moon = MILESTONES[-1]
+    L_ = []
+    a = L_.append
     a('include("SOVIETInstructions.txt");')
     a('')
-    for v in ('i', 'j', 'k', 'n', 'r', 'day', 'year', 'winexist', 'bContinue', 'prestige', 'nVeh', 'nPad', 'nExperts', 'nTrack',
-              'nResearch', 'fi', 'fj', 'fk', 'fn', 'si', 'sn', 'ti', 'tn', 'bi', 'bn', 'ci', 'cn', 'nFirsts', 'nSeconds',
+    for v in ('i', 'j', 'k', 'n', 'r', 'day', 'year', 'winexist', 'bContinue', 'nVeh', 'nPad', 'nExperts', 'nTrack',
+              'nResearch', 'fi', 'fj', 'fk', 'fn', 'si', 'sn', 'ti', 'tn', 'bi', 'bn', 'ci', 'cn',
               'li', 'ln', 'lk', 'rr', 'ki', 'kn', 'nCosmo', 'nCosmoShown', 'bObjReady', 'bCosmoObj',
-              'nBlockedPad', 'nBlockUntil', 'nNow', 'nPadOK', 'nTest'):
+              'nBlockedPad', 'nBlockUntil', 'nNow', 'nPadOK', 'nTest', 'nNeedCrew', 'nNeedTrack'):
         a('defineVariable(int, %s);' % v)
-    for v in ('f', 'f2', 'fFail', 'fFuel', 'fLox', 'fHyper', 'fCraft', 'fFood', 'fDist', 'fLoyal', 'fr', 'fCosmo', 'fUp'):
+    for v in ('f', 'f2', 'fFail', 'fFuel', 'fLox', 'fHyper', 'fCraft', 'fFood', 'fDist', 'fLoyal', 'fr', 'fCosmo', 'fUp',
+              'fNeed'):
         a('defineVariable(float, %s);' % v)
     a('defineVariable(vec3, padPos);')
     a('defineVariable(vec3, vtmp);')
@@ -170,7 +271,7 @@ def gen_script():
     a('\treturn(fn);')
     a('}')
     a('')
-    # --- tracking stations: our TYPE_BROADCAST with 40 workers / 30 professors
+    # --- engine test stands and tracking stations: known by their type and staff numbers
     a('defineFunction(CountTestStands, int)')
     a('{')
     a('\tfk = 0;')
@@ -178,7 +279,8 @@ def gen_script():
     a('\tfor (bi=0, bi<bn, bi=bi+1)')
     a('\t{')
     a('\t\tbui.GetDataByIndex(bi);')
-    a('\t\tif (bui.nValidRead & bui.nType ? BUILDINGTYPE_FACTORY & bui.nWorkersNeeded ? 80 & bui.nProffesorsNeeded ? 40 & bui.fPercFinished > 0.9999 & bui.nWorkersNum > 0)')
+    a('\t\tif (bui.nValidRead & bui.nType ? BUILDINGTYPE_FACTORY & bui.nWorkersNeeded ? %s & bui.nProffesorsNeeded ? %s & bui.fPercFinished > 0.9999 & bui.nWorkersNum > 0)'
+      % (t.i('stand_workers', stand_w), t.i('stand_educated', stand_e)))
     a('\t\t{')
     a('\t\t\tfk = fk + 1;')
     a('\t\t}')
@@ -193,7 +295,8 @@ def gen_script():
     a('\tfor (bi=0, bi<bn, bi=bi+1)')
     a('\t{')
     a('\t\tbui.GetDataByIndex(bi);')
-    a('\t\tif (bui.nValidRead & bui.nType ? BUILDINGTYPE_BROADCAST & bui.nProffesorsNeeded ? 30 & bui.nWorkersNeeded ? 40 & bui.fPercFinished > 0.9999)')
+    a('\t\tif (bui.nValidRead & bui.nType ? BUILDINGTYPE_BROADCAST & bui.nProffesorsNeeded ? %s & bui.nWorkersNeeded ? %s & bui.fPercFinished > 0.9999)'
+      % (t.i('track_educated', track_e), t.i('track_workers', track_w)))
     a('\t\t{')
     a('\t\t\tfk = fk + 1;')
     a('\t\t}')
@@ -227,7 +330,7 @@ def gen_script():
     a('\t\t\t\t\t\t\tnPadOK = 0;')
     a('\t\t\t\t\t\t}')
     a('\t\t\t\t\t}')
-    a('\t\t\t\t\tif (fDist < 90.0 & nPadOK)')
+    a('\t\t\t\t\tif (fDist < %s & nPadOK)' % t.f('park', L['park_distance']))
     a('\t\t\t\t\t{')
     a('\t\t\t\t\t\tfi = ti;')
     a('\t\t\t\t\t\tnPad = fj;')
@@ -252,15 +355,12 @@ def gen_script():
     a('\t\tif (bui.nValidRead & bui.nType ? BUILDINGTYPE_STORAGE & bui.nStorageNum > 0)')
     a('\t\t{')
     a('\t\t\tfDist = DistancePoints2D(bui.vPosition, padPos);')
-    a('\t\t\tif (fDist < %.1f)' % RADIUS)
+    a('\t\t\tif (fDist < %s)' % t.f('radius', L['radius']))
     a('\t\t\t{')
     a('\t\t\t\tres.ResetAmounts();')
     a('\t\t\t\tres.GetFromBuilding(si);')
-    a('\t\t\t\tfFuel = fFuel + res.%s;' % FIELD['fuel'])
-    a('\t\t\t\tfLox = fLox + res.%s;' % FIELD['lox'])
-    a('\t\t\t\tfHyper = fHyper + res.%s;' % FIELD['hyper'])
-    a('\t\t\t\tfCraft = fCraft + res.%s;' % FIELD['craft'])
-    a('\t\t\t\tfFood = fFood + res.%s;' % FIELD['food'])
+    for var, kind in (('fFuel', 'fuel'), ('fLox', 'lox'), ('fHyper', 'hyper'), ('fCraft', 'craft'), ('fFood', 'food')):
+        a('\t\t\t\t%s = %s + res.%s;' % (var, var, t.s('field_' + kind, field[kind])))
     a('\t\t\t}')
     a('\t\t}')
     a('\t}')
@@ -373,7 +473,9 @@ def gen_script():
     a('\tCheckCosmonauts();')
     a('\tDate_GetCurrentDate_D365Y(day, year);')
     for idx, m in enumerate(MILESTONES):
-        a('\tif (!usDone[%d] & (year > %d | (year ? %d & day > %d)))' % (idx, m['us_y'], m['us_y'], m['us_d'] - 1))
+        y, d = day_of_year(m['us_date'])
+        ty = t.i('us_year_%d' % idx, y)
+        a('\tif (!usDone[%d] & (year > %s | (year ? %s & day > %s)))' % (idx, ty, ty, t.i('us_day0_%d' % idx, d - 1)))
         a('\t{')
         a('\t\tusDone[%d] = 1;' % idx)
         a('\t\tif (srDone[%d])' % idx)
@@ -383,9 +485,7 @@ def gen_script():
         a('\t\telse()')
         a('\t\t{')
         a('\t\t\tNotification_CreateNewStringPic("United States", "%s The Americans got there first.", "research/%s.png", padPos);' % (esc(m['us_text']), m['icon']))
-        a('\t\t\tprestige = prestige - 5;')
-        a('\t\t\tnSeconds = nSeconds + 1;')
-        a('\t\t\tfLoyal = 0.0 - 0.05;')
+        a('\t\t\tfLoyal = %s;' % t.f('us_first_loyalty', R['america_first_loyalty'] / 100.0))
         a('\t\t\tBoostLoyalty(fLoyal);')
         a('\t\t}')
         a('\t}')
@@ -393,10 +493,11 @@ def gen_script():
     a('}')
     a('')
     # --- main
+    moon_when = t.s('moon_when', 'by ' + date_text(moon['us_date']))
     a('defineFunction(main, void)')
     a('{')
     a('\tInitConstants();')
-    a('\tprestige = 0; nFirsts = 0; nSeconds = 0; bObjReady = 0; bCosmoObj = 0; nCosmoShown = 0; nBlockUntil = 0;')
+    a('\tbObjReady = 0; bCosmoObj = 0; nCosmoShown = 0; nBlockUntil = 0;')
     a('\tnBlockedPad = 0 - 1;')
     a('\tfor (i=0, i<%d, i=i+1) { srDone[i] = 0; usDone[i] = 0; }' % len(MILESTONES))
     a('\tfor (i=0, i<6, i=i+1) { rocketOK[i] = 0; }')
@@ -408,13 +509,15 @@ def gen_script():
     a('\t\tnResearch = IsResearched("sr_rocketry");')
     a('\t\tCheckUSA();')
     a('\t}')
-    a('\tScenario_WindowWithImageLeft("The Space Programme", "The Rocket Research Institute has opened. Korolev\'s designers promise a satellite before the Americans, then a man in space, then the Moon. Research the space branch, build the plants, the launch complexes and the cosmonaut corps. The Americans will not wait: they are racing towards Apollo 11 in July 1969.", "programme.png", 3);')
+    a('\tScenario_WindowWithImageLeft("The Space Programme", "The Rocket Research Institute has opened. Korolev\'s designers promise a satellite before the Americans, then a man in space, then the Moon. Research the space branch, build the plants, the launch complexes and the cosmonaut corps. The Americans will not wait: they mean to land on the Moon %s.", "programme.png", 3);' % moon_when)
     a('\twinexist = 1;')
     a('\twhile (winexist) { Scenario_WindowExists(winexist); }')
-    a('\tScenario_ObjectiveCreate("sr_race", "The Space Race", "Reach every milestone before the United States. The last one: an N1 carrying cosmonauts to the Moon before 20 July 1969.");')
+    a('\tScenario_ObjectiveCreate("sr_race", "The Space Race", "Reach every milestone before the United States. The last one: an N1 carrying cosmonauts to the Moon before the Americans get there, %s.");' % moon_when)
     a('\tbObjReady = 1;')
     for idx, m in enumerate(MILESTONES):
         p = m['power'] - 9001
+        fuel, lox, hyper = t.f('fuel_%d' % idx, m['fuel']), t.f('lox_%d' % idx, m['lox']), t.f('hyper_%d' % idx, m['hyper'])
+        craft, food = t.f('craft_%d' % idx, m['craft']), t.f('food_%d' % idx, m['food'])
         a('')
         a('\t// ---------------------------------------------------------------- %s' % m['key'])
         a('\tObjectives_CreateNewString("sr_next", "Next: %s - research %s");' % (esc(m['title']), esc(research_name(m['research']))))
@@ -427,22 +530,30 @@ def gen_script():
         a('\t\tCheckUSA();')
         a('\t}')
         a('\tObjective_Remove("sr_next");')
-        a('\tScenario_WindowWithImageLeft("%s", "%s", "%s.png", 3);' % (esc(m['title']), esc(m['brief']), m['key']))
+        brief = m['brief'].replace('{radius}', t.i('radius_m', L['radius']))
+        a('\tScenario_WindowWithImageLeft("%s", "%s", "%s.png", 3);' % (esc(m['title']), esc(brief), m['key']))
         a('\twinexist = 1;')
         a('\twhile (winexist) { Scenario_WindowExists(winexist); }')
+        a('\tnNeedCrew = %s;' % t.i('crew_%d' % idx, m['crew']))
+        a('\tnNeedTrack = %s;' % t.i('track_%d' % idx, m['track']))
         a('\tObjectives_CreateNewString("sr_rocket", "%s on a launch pad");' % m['rocket'])
         a('\tObjective_AddRequirement("sr_rocket", 1.0, "research/%s.png");' % m['icon'])
-        need_prop = m['fuel'] + m['lox'] + m['hyper']
         a('\tObjectives_CreateNewString("sr_prop", "Propellant near the pad (t)");')
-        a('\tObjective_AddRequirement("sr_prop", %.1f, "resources/fuel.png");' % need_prop)
+        a('\tObjective_AddRequirement("sr_prop", %s, "resources/fuel.png");' % t.f('prop_%d' % idx, m['fuel'] + m['lox'] + m['hyper']))
         a('\tObjectives_CreateNewString("sr_craft", "Payload near the pad (t)");')
-        a('\tObjective_AddRequirement("sr_craft", %.1f, "resources/%s.png");' % (m['craft'], GOOD['craft']))
-        if m['crew']:
-            a('\tObjectives_CreateNewString("sr_crew", "Cosmonauts (experts)");')
-            a('\tObjective_AddRequirement("sr_crew", %.1f, "research/sr_manned_flight.png");' % m['crew'])
-        if m['track']:
-            a('\tObjectives_CreateNewString("sr_track", "Tracking stations");')
-            a('\tObjective_AddRequirement("sr_track", %.1f, "research/sr_satellite.png");' % m['track'])
+        a('\tObjective_AddRequirement("sr_craft", %s, "resources/%s.png");' % (craft, t.s('craft_icon', craft_good)))
+        a('\tif (nNeedCrew > 0)')
+        a('\t{')
+        a('\t\tObjectives_CreateNewString("sr_crew", "Cosmonauts (experts)");')
+        a('\t\tf = nNeedCrew;')
+        a('\t\tObjective_AddRequirement("sr_crew", f, "research/sr_manned_flight.png");')
+        a('\t}')
+        a('\tif (nNeedTrack > 0)')
+        a('\t{')
+        a('\t\tObjectives_CreateNewString("sr_track", "Tracking stations");')
+        a('\t\tf = nNeedTrack;')
+        a('\t\tObjective_AddRequirement("sr_track", f, "research/sr_satellite.png");')
+        a('\t}')
         a('\twhile (!srDone[%d])' % idx)
         a('\t{')
         a('\t\tScript_Sleep(10.0);')
@@ -455,43 +566,47 @@ def gen_script():
         a('\t\t{')
         a('\t\t\tSumNear();')
         a('\t\t\tf = 0;')
-        if m['fuel']:
-            a('\t\t\tif (fFuel > %.1f) { f = f + %.1f; } else() { f = f + fFuel; bContinue = 0; }' % (m['fuel'], m['fuel']))
-        if m['lox']:
-            a('\t\t\tif (fLox > %.1f) { f = f + %.1f; } else() { f = f + fLox; bContinue = 0; }' % (m['lox'], m['lox']))
-        if m['hyper']:
-            a('\t\t\tif (fHyper > %.1f) { f = f + %.1f; } else() { f = f + fHyper; bContinue = 0; }' % (m['hyper'], m['hyper']))
+        # a need of 0 passes: fNeed is then just below zero
+        for need, have in ((fuel, 'fFuel'), (lox, 'fLox'), (hyper, 'fHyper')):
+            a('\t\t\tfNeed = %s - 0.01;' % need)
+            a('\t\t\tif (%s > fNeed) { f = f + %s; } else() { f = f + %s; bContinue = 0; }' % (have, need, have))
         a('\t\t\tObjective_UpdateRequirement("sr_prop", 0, f);')
         a('\t\t\tf = fCraft;')
-        a('\t\t\tif (f > %.1f) { f = %.1f; }' % (m['craft'], m['craft']))
+        a('\t\t\tif (f > %s) { f = %s; }' % (craft, craft))
         a('\t\t\tObjective_UpdateRequirement("sr_craft", 0, f);')
-        a('\t\t\tif (fCraft < %.1f) { bContinue = 0; }' % m['craft'])
-        if m['food']:
-            a('\t\t\tif (fFood < %.1f) { bContinue = 0; }' % m['food'])
+        a('\t\t\tfNeed = %s - 0.01;' % craft)
+        a('\t\t\tif (fCraft < fNeed) { bContinue = 0; }')
+        a('\t\t\tfNeed = %s - 0.01;' % food)
+        a('\t\t\tif (fFood < fNeed) { bContinue = 0; }')
         a('\t\t}')
-        if m['crew']:
-            a('\t\tnExperts = CountExperts();')
-            a('\t\tf = nExperts;')
-            a('\t\tObjective_UpdateRequirement("sr_crew", 0, f);')
-            a('\t\tif (nExperts < %d) { bContinue = 0; }' % m['crew'])
-        if m['track']:
-            a('\t\tnTrack = CountTracking();')
-            a('\t\tf = nTrack;')
-            a('\t\tObjective_UpdateRequirement("sr_track", 0, f);')
-            a('\t\tif (nTrack < %d) { bContinue = 0; }' % m['track'])
+        a('\t\tif (nNeedCrew > 0)')
+        a('\t\t{')
+        a('\t\t\tnExperts = CountExperts();')
+        a('\t\t\tf = nExperts;')
+        a('\t\t\tObjective_UpdateRequirement("sr_crew", 0, f);')
+        a('\t\t\tif (nExperts < nNeedCrew) { bContinue = 0; }')
+        a('\t\t}')
+        a('\t\tif (nNeedTrack > 0)')
+        a('\t\t{')
+        a('\t\t\tnTrack = CountTracking();')
+        a('\t\t\tf = nTrack;')
+        a('\t\t\tObjective_UpdateRequirement("sr_track", 0, f);')
+        a('\t\t\tif (nTrack < nNeedTrack) { bContinue = 0; }')
+        a('\t\t}')
         a('\t\tif (bContinue)')
         a('\t\t{')
         a('\t\t\t// launch: the spacerace plugin takes the load from the storages and flies the flagged rocket')
         a('\t\t\tScenario_ObjectiveMoveCameraTo(padPos, 260.0);')
         a('\t\t\tNotification_CreateNewStringPic("Launch", "%s ignition... lift-off!", "research/%s.png", padPos);' % (m['rocket'], m['icon']))
         a('\t\t\tScript_Sleep(4.0);')
-        a('\t\t\tfFail = %d - 5 * rocketOK[%d];' % (m['fail'], p))
-        if m['key'] == 'moon':
+        a('\t\t\tfFail = %s - %s * rocketOK[%d];' % (t.i('fail_%d' % idx, m['fail']), t.i('per_success', L['failure_per_success']), p))
+        if m is moon:
             a('\t\t\tr = IsResearched("sr_nk33");')
-            a('\t\t\tif (r) { fFail = fFail - 35; }')
+            a('\t\t\tif (r) { fFail = fFail - %s; }' % t.i('nk33', L['failure_nk33']))
         a('\t\t\tnTest = CountTestStands();')
-        a('\t\t\tif (nTest > 0) { fFail = fFail - 10; }')
-        a('\t\t\tif (fFail < 5) { fFail = 5; }')
+        a('\t\t\tif (nTest > 0) { fFail = fFail - %s; }' % t.i('test_stand', L['failure_test_stand']))
+        fmin = t.i('fail_min', L['failure_min'])
+        a('\t\t\tif (fFail < %s) { fFail = %s; }' % (fmin, fmin))
         a('\t\t\tRandom(r);')
         a('\t\t\tr = r % 100;')
         a('\t\t\tfr = r;')
@@ -501,7 +616,6 @@ def gen_script():
         a('\t\t\t\tScript_Sleep(3.0);')
         a('\t\t\t\tnVeh = FindLaunched(%d.0);' % m['power'])
         a('\t\t\t\tif (nVeh > -1) { Vehicle_Sell(nVeh, 0, 0); }')
-        a('\t\t\t\tprestige = prestige - 2;')
         a('\t\t\t\tgs.GetCurrentGameSettigns();')
         a('\t\t\t\tif (gs.FiresEnabled)')
         a('\t\t\t\t{')
@@ -510,10 +624,11 @@ def gen_script():
         a('\t\t\t\t}')
         a('\t\t\t\telse()')
         a('\t\t\t\t{')
+        repair = t.i('repair_days', L['pad_repair_days'])
         a('\t\t\t\t\tDate_GetCurrentDate_D365Y(day, year);')
         a('\t\t\t\t\tnBlockedPad = nPad;')
-        a('\t\t\t\t\tnBlockUntil = year * 365 + day + %d;' % PAD_REPAIR_DAYS)
-        a('\t\t\t\t\tNotification_CreateNewStringPic("Launch failure", "The %s exploded and wrecked the pad. Repairs take %d days; build another rocket meanwhile.", "research/%s.png", padPos);' % (m['rocket'], PAD_REPAIR_DAYS, m['icon']))
+        a('\t\t\t\t\tnBlockUntil = year * 365 + day + %s;' % repair)
+        a('\t\t\t\t\tNotification_CreateNewStringPic("Launch failure", "The %s exploded and wrecked the pad. Repairs take %s days; build another rocket meanwhile.", "research/%s.png", padPos);' % (m['rocket'], repair, m['icon']))
         a('\t\t\t\t}')
         a('\t\t\t}')
         a('\t\t\telse()')
@@ -533,18 +648,15 @@ def gen_script():
         a('\t\t\t\trocketOK[%d] = rocketOK[%d] + 1;' % (p, p))
         a('\t\t\t\tif (usDone[%d])' % idx)
         a('\t\t\t\t{')
-        a('\t\t\t\t\tprestige = prestige + 3;')
-        a('\t\t\t\t\tMoney_AddUSD(5000);')
-        a('\t\t\t\t\tfLoyal = 0.03;')
+        a('\t\t\t\t\tMoney_AddUSD(%s);' % t.i('second_money', max(0, R['second_money'])))
+        a('\t\t\t\t\tfLoyal = %s;' % t.f('second_loyalty', R['second_loyalty'] / 100.0))
         a('\t\t\t\t\tBoostLoyalty(fLoyal);')
         a('\t\t\t\t\tScenario_WindowWithImageLeft("%s", "%s The Americans did it first, but we are catching up.", "%s.png", 3);' % (esc(m['title']), esc(m['win']), m['key']))
         a('\t\t\t\t}')
         a('\t\t\t\telse()')
         a('\t\t\t\t{')
-        a('\t\t\t\t\tprestige = prestige + 10;')
-        a('\t\t\t\t\tnFirsts = nFirsts + 1;')
-        a('\t\t\t\t\tMoney_AddUSD(25000);')
-        a('\t\t\t\t\tfLoyal = 0.12;')
+        a('\t\t\t\t\tMoney_AddUSD(%s);' % t.i('first_money', max(0, R['first_money'])))
+        a('\t\t\t\t\tfLoyal = %s;' % t.f('first_loyalty', R['first_loyalty'] / 100.0))
         a('\t\t\t\t\tBoostLoyalty(fLoyal);')
         a('\t\t\t\t\tScenario_WindowWithImageLeft("%s", "%s A Soviet first: the world is watching.", "%s.png", 3);' % (esc(m['title']), esc(m['win']), m['key']))
         a('\t\t\t\t}')
@@ -553,8 +665,10 @@ def gen_script():
         a('\t\t\t}')
         a('\t\t}')
         a('\t}')
-        for o in ('sr_rocket', 'sr_prop', 'sr_craft') + (('sr_crew',) if m['crew'] else ()) + (('sr_track',) if m['track'] else ()):
+        for o in ('sr_rocket', 'sr_prop', 'sr_craft'):
             a('\tObjective_Remove("%s");' % o)
+        a('\tif (nNeedCrew > 0) { Objective_Remove("sr_crew"); }')
+        a('\tif (nNeedTrack > 0) { Objective_Remove("sr_track"); }')
     last = len(MILESTONES) - 1
     a('')
     a('\tif (usDone[%d])' % last)
@@ -564,8 +678,8 @@ def gen_script():
     a('\telse()')
     a('\t{')
     a('\t\tScenario_WindowWithImageLeft("Victory in the Space Race", "A Soviet cosmonaut walked on the Moon before any American. From Sputnik to the N1, the republic won the race to space.", "moon.png", 3);')
-    a('\t\tMoney_AddUSD(100000);')
-    a('\t\tfLoyal = 0.2;')
+    a('\t\tMoney_AddUSD(%s);' % t.i('victory_money', max(0, R['victory_money'])))
+    a('\t\tfLoyal = %s;' % t.f('victory_loyalty', R['victory_loyalty'] / 100.0))
     a('\t\tBoostLoyalty(fLoyal);')
     a('\t}')
     a('\twinexist = 1;')
@@ -573,7 +687,7 @@ def gen_script():
     a('\tScenario_ObjectiveSetCompleted("sr_race", 0, 1);')
     a('\tScenario_UnlockNextScenarios();')
     a('}')
-    return '\r\n'.join(L) + '\r\n'
+    return '\r\n'.join(L_) + '\r\n'
 
 
 def vanilla_style(src):
@@ -651,23 +765,29 @@ def images():
            'luna': ('build/space/tracking.png', None), 'vostok': ('build/space_vehicles/showcase_sr_pad_r7.png', None),
            'voskhod': ('build/space/training.png', None), 'soyuz': ('build/space/spacecraft.png', None),
            'zond': ('build/space/propellant.png', None), 'moon': ('build/space_vehicles/showcase_sr_pad_n1.png', None)}
-    mdir = os.path.join(OUT, MISSION)
     for key, (p, _) in src.items():
         im = Image.open(os.path.join(ROOT, p)).convert('RGB')
         w, h = im.size
         s = min(w, h)
         im = im.crop(((w - s) // 2, (h - s) // 2, (w + s) // 2, (h + s) // 2)).resize((400, 400), Image.LANCZOS).transpose(Image.FLIP_LEFT_RIGHT)
-        im.save(os.path.join(mdir, key + '.png'))
-    Image.open(os.path.join(mdir, 'programme.png')).save(os.path.join(OUT, 'previewimage.png'))
-    Image.open(os.path.join(mdir, 'programme.png')).resize((128, 128), Image.LANCZOS).save(os.path.join(OUT, 'icon.png'))
-    Image.open(os.path.join(mdir, 'moon.png')).save(os.path.join(OUT, 'end.png'))
-    Image.open(os.path.join(mdir, 'programme.png')).resize((128, 128), Image.LANCZOS).save(os.path.join(mdir, 'icon.png'))
+        im.save(os.path.join(PROG, key + '.png'))
+    Image.open(os.path.join(PROG, 'programme.png')).save(os.path.join(OUT, 'previewimage.png'))
+    Image.open(os.path.join(PROG, 'programme.png')).resize((128, 128), Image.LANCZOS).save(os.path.join(OUT, 'icon.png'))
+    Image.open(os.path.join(PROG, 'moon.png')).save(os.path.join(OUT, 'end.png'))
+    Image.open(os.path.join(PROG, 'programme.png')).resize((128, 128), Image.LANCZOS).save(os.path.join(PROG, 'icon.png'))
+
+
+def render(template, values):
+    """Fill @token@s the way the plugin does."""
+    import re
+    return re.sub(r'@([a-z0-9_]+)@', lambda m: values[m.group(1)], template)
 
 
 def main():
-    if os.path.isdir(OUT):
-        shutil.rmtree(OUT)
-    os.makedirs(os.path.join(OUT, MISSION))
+    for d in (OUT, PROG):
+        if os.path.isdir(d):
+            shutil.rmtree(d)
+        os.makedirs(d)
     for d in sorted(os.listdir(LEGACY)):
         if os.path.isdir(os.path.join(LEGACY, d)):
             shutil.copytree(os.path.join(LEGACY, d), os.path.join(OUT, d))
@@ -676,37 +796,59 @@ def main():
         '$DESCRIPTION_STR "Beat the United States to orbit, to a man in space and to the Moon. Starts itself in any game; nothing happens until the Rocket Research Institute is researched."',
         '$END_TEXT_STR "The race to the Moon is over."',
         '$AVAILABLE_ON_ALL_MAPS', '$END', '']))
-    open(os.path.join(OUT, MISSION, 'script.ini'), 'w', newline='').write('\r\n'.join([
-        '$RUNSCRIPT %s.txt' % MISSION, '$NAME_STR "The Space Race"',
+    open(os.path.join(PROG, 'script.ini'), 'w', newline='').write('\r\n'.join([
+        '$RUNSCRIPT race.txt', '$NAME_STR "The Space Race"',
         '$DESCRIPTION_STR "From Sputnik to the N1: eight milestones against the American timeline."',
         '$TREEXPOS 0', '$STARTUNLOCKED', '$END', '']))
-    src = vanilla_style(gen_script())
-    assert '>=' not in src and '<=' not in src and '!=' not in src and '==' not in src, 'operator the VM lacks'
-    missing = lint(src)
+    tt = Tok(True)
+    tmpl = vanilla_style(gen_script(tt))
+    renders = []
+    for new_goods in (False, True):
+        td = Tok(False)
+        src = vanilla_style(gen_script(td, new_goods))
+        assert set(tt.values) == set(td.values) and render(tmpl, td.values) == src, 'template and rendered defaults differ'
+        assert '>=' not in src and '<=' not in src and '!=' not in src and '==' not in src, 'operator the VM lacks'
+        renders.append((DEFAULT_RENDER % int(new_goods), src))
+    missing = lint(renders[0][1]) + lint(renders[1][1])
+    meta = ['; generated by tools/space_scenario.py - for the spacerace plugin, which renders race.tmpl',
+            '; goods <fuel> <lox> <hyper> <craft> <food>: the game goods behind the @fuel_N@ .. @food_N@ tokens',
+            'goods ' + ' '.join(GOOD[k] for k, _ in LOAD_KEYS),
+            '; milestone <key> <rocket>, in template order: tokens _0, _1, ... belong to these']
+    meta += ['milestone %s %s' % (m['key'], ROCKET_OF[m['power']]) for m in MILESTONES]
+    meta += ['; tokens: ' + ' '.join(sorted(tt.values))]
+    open(os.path.join(PROG, 'milestones.txt'), 'w', newline='').write('\r\n'.join(meta) + '\r\n')
+    open(os.path.join(PROG, 'race.tmpl'), 'w', newline='').write(tmpl)
+    os.makedirs(os.path.dirname(DEFAULT_RENDER), exist_ok=True)
+    for path, text in renders:
+        open(path, 'w', newline='').write(text)
     lines = ['; generated by tools/space_scenario.py (goods from space_goods.py) - read by the spacerace plugin.',
-             '; What each rocket takes at lift-off from storage buildings within `radius` of its pad, and how long',
-             '; the plugin flies it before the script removes it.',
-             'radius %.0f' % RADIUS, 'climb_seconds %d' % CLIMB_SECONDS]
+             '; The pads, effects and script goods of the launches. The loads, bills, radius and climb here are the',
+             '; defaults and the rules of the frozen legacy missions; spacerace.ini [rockets], [rocket_parts] and',
+             '; [launches] set them for the current programme.',
+             'radius %d' % L['radius'], 'climb_seconds %d' % L['climb_seconds']]
     lines += ['; effects from particleeffect/particleeffects.ini: under the rocket, its trail, round the pad at lift-off, a failure',
               'fx_flame airplane_jet', 'fx_smoke big_firesmoke', 'fx_pad factory_big_white', 'fx_boom buildingfall2',
               ]
     lines += ['; vm_goods: added goods scripts may read, answered with _Resources_reserved_16_.._19_ in this order']
     lines += ['vm_goods ' + ' '.join(G.VM_GOODS) if G.USE_NEW_GOODS else '; (stand-in goods: no vm_goods)']
+    lines += ['; standin <new good> <vanilla good>: what plays each new good while spacerace.ini has new_goods = 0']
+    lines += ['standin %s %s' % (g, G.STANDIN[g]) for g in G.NEW]
     lines += ['; rocket <object> <the only pad kind it may stand on> then <good> <tonnes> pairs taken at lift-off']
     for k, v in LOADS.items():
         pairs = ' '.join('%s %g' % (GOOD[key], v[key]) for key, _ in LOAD_KEYS if v[key])
-        lines.append('rocket %s %s %s' % (k, 'sr_pad_n1' if k == 'sr_n1' else 'sr_pad_r7', pairs))
+        lines.append('rocket %s %s %s' % (k, PAD_OF.get(k, 'sr_pad_r7'), pairs))
     if G.USE_NEW_GOODS:
         lines += ['; bill <object> then <good> <tonnes> pairs: what the MIK builds it from (workdays stay the engine\'s)']
         lines += ['bill %s %s' % (k, ' '.join('%s %g' % gt for gt in v)) for k, v in G.BILL.items()]
-    open(os.path.join(ROOT, 'mod', 'plugins', 'spacerace', 'data', 'launches.ini'), 'w', newline='').write('\r\n'.join(lines) + '\r\n')
-    open(os.path.join(OUT, MISSION, MISSION + '.txt'), 'w', newline='').write(src)
+    open(os.path.join(DATA, 'launches.ini'), 'w', newline='').write('\r\n'.join(lines) + '\r\n')
     images()
-    print('scenario: %d milestones, %d lines of VM script; undeclared names: %s' % (len(MILESTONES), src.count('\r\n'), missing or 'none'))
+    print('programme: %d milestones, %d tokens, %d lines of VM script; undeclared names: %s'
+          % (len(MILESTONES), len(tt.values), src.count('\r\n'), missing or 'none'))
     # the compiler's own rules (argument types, function endings, fields, ...): see tools/vmcheck.py
-    r = subprocess.run([sys.executable, os.path.join(ROOT, 'tools', 'vmcheck.py'), os.path.join(OUT, MISSION, MISSION + '.txt')])
-    if r.returncode:
-        sys.exit('vmcheck found problems in the generated script')
+    for path, _text in renders:
+        r = subprocess.run([sys.executable, os.path.join(ROOT, 'tools', 'vmcheck.py'), path])
+        if r.returncode:
+            sys.exit('vmcheck found problems in the generated script')
 
 
 if __name__ == '__main__':

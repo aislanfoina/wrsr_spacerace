@@ -5,7 +5,13 @@
 //   - the hooks are installed in TsmPluginStart, like every other plugin RML hosts;
 //   - safe defaults with no ini: inject (hook = 2), no customhouse hook (survivors owns
 //     that tick), no price table in the log (RML's logger mishandles width specifiers);
-//   - H->provide is optional.
+//   - H->provide is optional;
+//   - spacerace.ini beside this DLL switches it: [general] new_goods = 0 adds nothing, so
+//     saves stay the base game's (without a spacerace.ini it always runs). Then only
+//     ResourceGet is hooked, to read the six goods a save may still name as their vanilla
+//     stand-ins (spacerace_data/launches.ini "standin" lines): the save loads, and the next
+//     save is a base-game one. Without that, a warehouse slot of an unknown good is left
+//     empty and the save writer crashes on it (tested 2026-09-30).
 // tools/port_resources.py regenerates this file from the vendored one.
 
 // resources - resources the base game does not have, as a tesmioloader plugin.
@@ -1972,6 +1978,45 @@ static void h_PricePass(void* game)
     LeaveCriticalSection(&g_lock);
 }
 
+// Space Race stand-ins (new_goods = 0): a new good a save still names is answered with the
+// record of the vanilla good that plays it, so warehouses, vehicles and customhouses keep a real
+// resource in every slot and the next save writes the stand-in's name.
+struct Alias { char name[32]; char as[32]; };
+static Alias g_alias[16];
+static int   g_aliasCount;
+static volatile LONG g_nAliased;
+
+static int LoadAliases(const char* dir)
+{
+    char path[MAX_PATH];
+    _snprintf_s(path, sizeof(path), _TRUNCATE, "%s\\spacerace_data\\launches.ini", dir);
+    FILE* f = NULL;
+    if (fopen_s(&f, path, "r") != 0 || !f) return 0;
+    char line[256];
+    while (fgets(line, sizeof(line), f) && g_aliasCount < 16)
+    {
+        char k[16] = { 0 }, a[32] = { 0 }, b[32] = { 0 };
+        if (sscanf_s(line, "%15s %31s %31s", k, (unsigned)sizeof(k), a, (unsigned)sizeof(a), b, (unsigned)sizeof(b)) == 3 &&
+            strcmp(k, "standin") == 0)
+        {
+            strcpy_s(g_alias[g_aliasCount].name, sizeof(g_alias[0].name), a);
+            strcpy_s(g_alias[g_aliasCount].as, sizeof(g_alias[0].as), b);
+            ++g_aliasCount;
+        }
+    }
+    fclose(f);
+    return g_aliasCount;
+}
+
+static BYTE* AliasRecord(const char* name)
+{
+    ResVector* vec = (ResVector*)(g_exeBase + g_vecRva);
+    int off = g_nameOff >= 0 ? g_nameOff : 0;
+    for (BYTE* r = vec->begin; r && r + RES_STRIDE <= vec->end; r += RES_STRIDE)
+        if (strncmp((const char*)r + off, name, 32) == 0) return r;
+    return NULL;
+}
+
 static unsigned __int64 h_ResourceGet(void* a1, void* a2, void* a3, void* a4)
 {
     char n1[128], n2[128];
@@ -1994,6 +2039,19 @@ static unsigned __int64 h_ResourceGet(void* a1, void* a2, void* a3, void* a4)
     unsigned __int64 r = o_ResourceGet(a1, a2, a3, a4);
 
     if (!name) return r;
+
+    if (r == 0 && g_aliasCount)
+        for (int i = 0; i < g_aliasCount; i++)
+        {
+            if (strcmp(g_alias[i].name, name) != 0) continue;
+            BYTE* rec = NULL;
+            __try { rec = AliasRecord(g_alias[i].as); }
+            __except (FaultFilter("resources alias", GetExceptionInformation())) { rec = NULL; }
+            if (!rec) break;
+            if (InterlockedIncrement(&g_nAliased) <= 12)
+                Logf("resource  \"%s\" read as its stand-in \"%s\" (new_goods = 0)", name, g_alias[i].as);
+            return (unsigned __int64)rec;
+        }
 
     EnterCriticalSection(&g_lock);
     bool first = MarkSeen(name);
@@ -2324,10 +2382,22 @@ extern "C" __declspec(dllexport) int TsmPluginStart(void)
     g_baseDir = g_selfDir;                      // the ini and the log live beside the DLL
     _snprintf_s(g_iniFile, sizeof g_iniFile, _TRUNCATE, "%s\\resources.ini", g_selfDir);
 
+    // the Space Race's switch for its new goods. Off: nothing is added, so saves stay the base
+    // game's, and a save that still names them reads each as its stand-in
+    char spacerace[MAX_PATH];
+    _snprintf_s(spacerace, sizeof spacerace, _TRUNCATE, "%s\\spacerace.ini", g_selfDir);
+    bool aliasOnly = GetFileAttributesA(spacerace) != INVALID_FILE_ATTRIBUTES && GetPrivateProfileIntA("general", "new_goods", 0, spacerace) == 0;
+    if (aliasOnly && !LoadAliases(g_selfDir))
+    {
+        Logf("resource  spacerace.ini new_goods = 0 - no mod resources, saves stay the base game's");
+        return 0;
+    }
+
     const char* ini = "plugins\\resources.ini";
     char v[64];
 
     g_resHook = CfgInt(ini, "resources", "hook", g_resHook);
+    if (aliasOnly) g_resHook = 1;               // observe and alias: no registry, no records of our own
     if (!g_resHook)
     {
         Logf("resource  hook = 0 - no mod resources");
@@ -2377,6 +2447,12 @@ extern "C" __declspec(dllexport) int TsmPluginStart(void)
                            (void**)&o_ResourceGet, kResourceGetPrologue,
                            STOLEN_BYTES, "ResourceGet"))
         return 1;
+    if (aliasOnly)
+    {
+        Logf("resource  spacerace.ini new_goods = 0 - no mod resources, saves stay the base game's; "
+             "%d new goods a save may still hold are read as their stand-ins", g_aliasCount);
+        return 0;
+    }
 
     // Captions for mod resources. Every string in the game comes through here,
     // so it is hooked whatever mode we are in - the ids we mint are answered
