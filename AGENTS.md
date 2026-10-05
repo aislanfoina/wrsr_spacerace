@@ -21,8 +21,8 @@ plugins (API 3/4). Three plugins (all C++, MSVC x64, /MT): `spacerace`, `experts
 
 Status (2026-10-05): every feature has run in the game; the full race has not been played through.
 `spacerace.ini` ships with `test_mode = 0` (1 = space research at 5 % cost, no year limits, for
-testing). The seven Workshop items exist on Steam, **unpublished** (ids in section 11 and in
-`tools/space_workshop.py` `ITEMS`); their content upload and going public are still open.
+testing). The seven Workshop items are uploaded and **public** on Steam (ids in section 11 and
+in `tools/space_workshop.py` `ITEMS`).
 
 ## 2. Ground rules
 
@@ -84,7 +84,7 @@ vendor/TesmioLoader/       API headers (GPL-3.0) and the vendored resources plug
   `SovietRepublic\log.html` (strip tags; base-game noise: `ResourceGet - not found waste`,
   `Read error (8)` on `replace_history.bin` / `usedveh.bin`).
 - **Regenerating content:** see README "Rebuilding the content". Order: `build_space.py`
-  (textures, kit, rockets, previews; needs Blender 5.2) -> `space_research.py` ->
+  (textures, kit, rockets, previews, Workshop posters via `space_thumbs.py`; needs Blender 5.2) -> `space_research.py` ->
   `space_scenario.py` (checks the rendered programme with `tools/vmcheck.py`) -> `space_settings.py`
   -> `space_workshop.py`. `build_space.py inis` rewrites only the kit's building files (both goods
   variants). `space_layout.py` checks truck bays against the models.
@@ -274,22 +274,44 @@ Steam Workshop items (created in the game 2026-10-05, owner @aislanfoina's Steam
 | kit | 3814049784 | Building |
 | sr_sputnik / sr_vostok / sr_soyuz / sr_proton / sr_n1 | 3814050253 / 3814050457 / 3814052488 / 3814050971 / 3814051385 | Vehicle |
 
-(3814050684 is a stray duplicate "Soyuz" created as a vehicle skin by mistake - not used.)
+(3814050684 was a duplicate "Soyuz" created as a vehicle skin by mistake; deleted on Steam 2026-10-05.
+An item's type cannot be changed after creation - the edit page greys out the type arrows.)
 
 Release checklist: done - `test_mode = 0`; items created (main menu -> Workshop -> Your items (WIP)
 -> green +; the form wants a preview PNG under 1 MB, a name and a UTF-8 TXT description, which
 `python tools/space_workshop.py new` writes to `build/workshop_new/space_race`); ids in
 `tools/space_workshop.py` (`ITEMS`, which also sets `kit_item`; the kit and rocket generators
-read their ids from it); `build.ps1 -Install` (game and RML closed); kit and rockets uploaded
-2026-10-05. Open - upload the plugins item; set Required Items (kit, rockets, RML) on its page;
-merge `unstable` -> `dev` -> `main`; go public.
+read their ids from it); `build.ps1 -Install` (game and RML closed); all seven uploaded and made
+public 2026-10-05. Open - Required Items (kit, rockets, RML) on the plugins item's page; merge
+`unstable` -> `dev` -> `main`; re-upload all seven with the poster thumbnails (`space_thumbs.py`).
 
 How an upload works: Workshop -> Your items (WIP) -> the item's Edit item page -> the green check
 ("Save changes"). For an item Steam knows, that check IS the upload ("Connecting to STEAMWORKS",
 "Uploading item..", "Item uploaded successfully"); there is no separate upload button, and items
-with local placeholder ids (90001xx) only save locally. Keep visibility **Unpublished**
-(`$VISIBILITY 0`: the game's values are 0 unpublished, 1 friends only, **2 public** - not Steam's
-enum).
+with local placeholder ids (90001xx) only save locally. **Every upload also sets the visibility**
+from the page (`$VISIBILITY` in workshopconfig.ini, the game's values: 0 unpublished, 1 friends
+only, 2 public - not Steam's enum, where 0 is public). The items are public now, so
+`space_workshop.py` writes 2; uploading with 0 would hide the mod. Check the page says Public
+before pressing the check. Steam's public API shows the live state (GetPublishedFileDetails,
+`visibility` in Steam's enum).
+
+**Without the game: `tools/workshop_upload.py`** updates title, description, preview, content,
+visibility and Required Items (or creates items) through the signed-in Steam client, using the
+game's own `steam_api64.dll` (flat API, ISteamUGC v012) as app 784150 - no password. Ids, texts,
+visibility and Required Items come from the packer's `workshop_items()`; preview and content come
+from the installed `workshop_wip/<id>` folder (run `build.ps1 -Install` first; content uploads refuse
+while the game or RML runs, or when plugin-generated files are in the folder). `--check` reports
+sign-in and differences from the live store pages without sending anything. **It must run outside
+any sandbox**: from an AI agent's sandboxed shell `SteamAPI_Init` fails (the game fails the same
+way), and the agent's auto mode treats uploads as publishing - both are the owner's permission
+settings to grant. Status 2026-10-05: written and compiled, not yet run against Steam; the first
+real run also confirms the result-struct sizes (`wait()` tries 16 then 8 bytes) and its post-check
+compares `time_updated` from the public API.
+
+Workshop thumbnails: `tools/space_thumbs.py` (cut-outs rendered by `tools/space_thumb_scene.py`,
+composed with Pillow and the Oswald font) writes each item's `previewimage.png` (under 1 MB) and
+`build/thumbs/posters/_sheet.png`. The square crop of a standing rocket loses its nose or its
+engines, so each poster fits the whole rocket to the height.
 
 **Uploading the plugins item (3814051864):** the plugins write files into their own item folder
 at start-up (`spacerace_data/buildings/*.ini`, `research_merged.ini`, `tesmioloader.resources.log`)

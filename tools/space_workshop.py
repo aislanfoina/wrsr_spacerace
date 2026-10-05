@@ -20,7 +20,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OWNER = 76561198165729857
-VISIBILITY = 0                  # unpublished; switch to public on Steam once the items are checked
+VISIBILITY = 2                  # public (the items went public on 2026-10-05); 0 would hide them on the next upload
 REPO = 'https://github.com/aislanfoina/wrsr_spacerace'
 ITEM_URL = 'https://steamcommunity.com/sharedfiles/filedetails/?id=%d'
 RML = ITEM_URL % 3787969749
@@ -118,6 +118,24 @@ def rocket_desc(key):
             % (ITEMS[key][3].replace('Space Race: ', ''), ROCKETS[key], ITEM_URL % ITEMS['package'][1], ITEM_URL % ITEMS['kit'][1])) + FOOTER
 
 
+def descriptions():
+    d = {'package': PACKAGE, 'kit': KIT}
+    d.update((k, rocket_desc(k)) for k in ROCKETS)
+    return d
+
+
+# Required Items on Steam: item -> the items (keys here, or Steam ids) a subscriber also needs
+REQUIRED = {'package': ['kit'] + list(ROCKETS) + [3787969749]}
+
+
+def workshop_items():
+    """The items as tools/workshop_upload.py reads them: key, Steam id, game item type, title,
+    store page text, the game's visibility value and Required Items (Steam ids)."""
+    descs = descriptions()
+    return [{'key': k, 'id': v[1], 'type': v[2], 'title': v[3], 'description': descs[k], 'visibility': VISIBILITY,
+             'required': [ITEMS[r][1] if r in ITEMS else r for r in REQUIRED.get(k, [])]} for k, v in ITEMS.items()]
+
+
 def config(key, desc, objects):
     folder, item, typ, name = ITEMS[key]
     assert len(desc) < 8000, '%s: Steam descriptions stop at 8000 characters (%d)' % (key, len(desc))
@@ -134,8 +152,7 @@ def new_items(out):
     """What the game's "create new item" form asks for, one PNG + one UTF-8 TXT per item, numbered in upload order."""
     import shutil
     os.makedirs(out, exist_ok=True)
-    descs = {'package': PACKAGE, 'kit': KIT}
-    descs.update((k, rocket_desc(k)) for k in ROCKETS)
+    descs = descriptions()
     order = ['kit'] + list(ROCKETS) + ['package']
     lines = ['Create each item in the game (Workshop -> Your items (WIP) -> green +), visibility Unpublished:', '']
     for n, key in enumerate(order, 1):
@@ -154,10 +171,11 @@ def new_items(out):
 def main():
     if sys.argv[1:2] == ['new']:
         return new_items(os.path.join(ROOT, 'build', 'workshop_new', 'space_race'))
-    config('package', PACKAGE, [])
-    config('kit', KIT, ['$OBJECT_BUILDING sr_%s' % k for k in KIT_OBJECTS])
+    descs = descriptions()
+    config('package', descs['package'], [])
+    config('kit', descs['kit'], ['$OBJECT_BUILDING sr_%s' % k for k in KIT_OBJECTS])
     for key in ROCKETS:
-        config(key, rocket_desc(key), ['$OBJECT_VEHICLE %s' % key])
+        config(key, descs[key], ['$OBJECT_VEHICLE %s' % key])
     # the research branch unlocks the kit's buildings by its item id
     ini = os.path.join(ROOT, 'mod', 'plugins', 'spacerace', 'spacerace.ini')
     text = open(ini, encoding='utf-8', newline='').read()

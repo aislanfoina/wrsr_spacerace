@@ -202,7 +202,7 @@ The research icons and the programme's window images are cut from the Blender re
 so run `build_space.py` first (it leaves them in `build/space` and `build/space_vehicles`):
 
 ```
-python tools/build_space.py            # textures, building kit, rockets, previews (needs Blender)
+python tools/build_space.py            # textures, building kit, rockets, previews, Workshop posters (needs Blender)
 python tools/build_space.py kit mik    # one stage for some buildings only
 python tools/space_research.py         # research branch, names and icons (needs the renders)
 python tools/build_space.py inis       # only the buildings' ini files, stand-in and new-goods variants
@@ -210,6 +210,7 @@ python tools/space_scenario.py         # the programme template + launches.ini, 
 python tools/space_settings.py         # spacerace.ini's balance part and data/defaults.ini, from all of the above
 python tools/space_workshop.py         # the seven Workshop items' configs and store pages, and kit_item
 python tools/readme_images.py          # the pictures in this README (renders in Blender, then docs/images)
+python tools/space_thumbs.py           # the seven Workshop posters (renders in Blender, then each previewimage.png)
 python tools/space_goods_icons.py      # icons of the new goods
 python tools/space_layout.py           # checks every truck bay against the building models
 python tools/port_resources.py         # re-ports the TesmioLoader resources plugin
