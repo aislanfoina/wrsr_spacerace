@@ -23,6 +23,8 @@ OWNER = 76561198165729857
 VISIBILITY = 2                  # public (the items went public on 2026-10-05); 0 would hide them on the next upload
 REPO = 'https://github.com/aislanfoina/wrsr_spacerace'
 ITEM_URL = 'https://steamcommunity.com/sharedfiles/filedetails/?id=%d'
+# the README's pictures, inline on the store pages ([img]); main only changes after review, so the links hold
+IMAGES = REPO.replace('https://github.com/', 'https://raw.githubusercontent.com/') + '/main/docs/images/'
 RML = ITEM_URL % 3787969749
 
 # key: (folder, Steam item id, item type, name). Created in the game on 2026-10-05 (dev ids were 90001xx).
@@ -54,6 +56,9 @@ The Ministry of General Machine Building (a name chosen so that nobody would gue
 
 The objective is simple: [b]put a Soviet cosmonaut on the Moon before 20 July 1969.[/b] The Americans have a head start, a larger budget and Apollo 11. You have kerosene, liquid oxygen and a Five-Year Plan.
 
+[img]%(img)scosmodrome.jpg[/img]
+[i]A cosmodrome in an ordinary republic. The Americans have not been told.[/i]
+
 [h2]WHAT THE STATE HAS APPROVED[/h2]
 [list]
 [*][b]A space branch in the research tree[/b]: 17 entries from 1946 to 1966, each unlocking its buildings.
@@ -66,6 +71,12 @@ The objective is simple: [b]put a Soviet cosmonaut on the Moon before 20 July 19
 [/list]
 The programme sleeps until you research the Rocket Research Institute, so it waits politely in any ordinary republic.
 
+[img]%(img)sbuildings.jpg[/img]
+[i]The sixteen buildings of the Space Race Kit.[/i]
+
+[img]%(img)srockets.jpg[/img]
+[i]R-7 Sputnik, Vostok-K, Soyuz, Proton and the N1, with a comrade for scale. The N1 needs the heavy complex; the others launch from Gagarin's Start.[/i]
+
 [h2]HOW TO JOIN THE RACE[/h2]
 [olist]
 [*]Subscribe to this item, the [b]Space Race Kit[/b] and the five rockets (the Required Items on this page), and to [url=%(rml)s]Republic Mod Loader[/url].
@@ -73,6 +84,9 @@ The programme sleeps until you research the Rocket Research Institute, so it wai
 [*]Load your republic or start a new one. Research the Rocket Research Institute and the programme takes it from there.
 [/olist]
 Requires Workers & Resources: Soviet Republic [b]1.1.1.9[/b]: the plugins patch this exact build.
+
+[img]%(img)spad_r7.jpg[/img]
+[i]A Vostok-K in the arms of Gagarin's Start.[/i]
 
 [h2]SAVES[/h2]
 Out of the box ([b]new_goods = 0[/b]) the mod adds no goods, and your existing republic can join the race as it is: liquid oxygen travels as chemicals, rocket parts as mechanical components and spacecraft as electronics. The six new goods ([b]new_goods = 1[/b]) can be switched on for an existing republic too: load it and they join the economy. Switched off again, whatever is in stock becomes its stand-in and the next save is a plain one. Save once after each switch, and keep a backup: the Party always does.
@@ -86,21 +100,40 @@ Early access. Every feature has run in the game, but nobody has played the whole
 [h2]REPORTING A LAUNCH FAILURE[/h2]
 Tell us what happened, what you were doing, and attach the Republic Mod Loader log. Unlike TASS, we want to hear about failures.
 
-''' % {'rml': RML} + FOOTER + '''
+[img]%(img)spad_n1.jpg[/img]
+[i]The N1 on Site 110. Historically: four launches, four explosions, zero press releases.[/i]
+
+''' % {'rml': RML, 'img': IMAGES} + FOOTER + '''
 
 [b]Build the rockets. Train the cosmonauts. Beat Apollo 11. The Motherland is watching, Comrade, and so, unfortunately, are the Americans.[/b]'''
 
 KIT = '''[h1]COMRADE, A COSMODROME DOES NOT BUILD ITSELF.[/h1]
-It does, however, come as a kit. Sixteen buildings of the Soviet space programme, modelled on the real ones:
+It does, however, come as a kit. Sixteen buildings of the Soviet space programme, modelled on the real ones.
+
+[img]%(img)scosmodrome.jpg[/img]
+[i]A cosmodrome in an ordinary republic. The Americans have not been told.[/i]
+
 [list]
 [*][b]Launch[/b]: the R-7 launch complex (Gagarin's Start), the N1 heavy complex (Site 110) and the MIK assembly building.
 [*][b]Rockets and parts[/b]: the Progress rocket plant, the OKB-456 engine works, an engine test stand, the oxygen-nitrogen plant, a propellant plant, instrument works and a spacecraft assembly hall.
 [*][b]Flight and crew[/b]: the Pluton deep space tracking station, Star City, OKB-1 and a landing and recovery field.
 [*][b]Glory[/b]: the Monument to the Conquerors of Space and the Gagarin column.
 [/list]
-Part of the [b]Space Race[/b]: subscribe to [url=%s]the Space Race item[/url] too, which unlocks these buildings through its research branch and makes the rockets fly. See that item for how to play.
 
-''' % (ITEM_URL % ITEMS['package'][1]) + FOOTER
+[img]%(img)sbuildings.jpg[/img]
+
+[h2]THE LAUNCH COMPLEXES[/h2]
+The MIK rolls each finished rocket out onto the pad it is linked to. The N1 needs the heavy complex; the others launch from Gagarin's Start. No amount of pushing will fit an N1 onto an R-7 pad.
+
+[img]%(img)spad_r7.jpg[/img]
+[i]A Vostok-K in the arms of Gagarin's Start.[/i]
+
+[img]%(img)spad_n1.jpg[/img]
+[i]The N1 on Site 110. Historically: four launches, four explosions, zero press releases.[/i]
+
+Part of the [b]Space Race[/b]: subscribe to [url=%(main)s]the Space Race item[/url] too, which unlocks these buildings through its research branch and makes the rockets fly. See that item for how to play.
+
+''' % {'img': IMAGES, 'main': ITEM_URL % ITEMS['package'][1]} + FOOTER
 
 ROCKETS = {
     'sr_sputnik': 'The Semyorka that opened the space age: Sputnik 1 on 4 October 1957, Laika a month later. Flies the first two milestones from the R-7 launch complex.',

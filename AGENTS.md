@@ -306,10 +306,10 @@ any sandbox**: from an AI agent's sandboxed shell `SteamAPI_Init` fails (the gam
 way), and the agent's auto mode treats uploads as publishing - both are the owner's permission
 settings to grant. Interfaces come from `SteamInternal_FindOrCreateUserInterface` (the SDK's own
 accessor route): the legacy `SteamClient()` + `SteamAPI_ISteamClient_GetISteam*` route returned a
-null interface with this DLL. Status 2026-10-05: `--check` verified against Steam by the owner
-(signed in, all seven items found, no differences); the upload, `required` and `create` paths have
-not run yet - the first real upload also confirms the result-struct size (`wait()` tries 16 then 8
-bytes), and its post-check compares `time_updated` from the public API.
+null interface with this DLL. Status 2026-10-05: `--check` and a `description` upload (the kit)
+verified against Steam by the owner; `preview`, `content`, `required` and `create` have not run
+yet. Store pages show the README's pictures inline (`[img]` on raw.githubusercontent.com, branch
+`main` - `IMAGES` in `space_workshop.py`); Steam renders them.
 
 Workshop thumbnails: `tools/space_thumbs.py` (cut-outs rendered by `tools/space_thumb_scene.py`,
 composed with Pillow and the Oswald font) writes each item's `previewimage.png` (under 1 MB) and
