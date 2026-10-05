@@ -161,8 +161,8 @@ def descriptions():
 REQUIRED = {'package': ['kit'] + list(ROCKETS) + [3787969749]}
 
 # The Steam collection of every item plus the loader, so "Subscribe to all" brings the lot.
-# 0 until tools/workshop_upload.py creates it; then its id goes here.
-COLLECTION_ID = 0
+# 0 until tools/workshop_upload.py creates it; then its id goes here (created 2026-10-05).
+COLLECTION_ID = 3814187744
 COLLECTION = '''[h1]COMRADE, THE WHOLE PROGRAMME COMES IN ONE CRATE.[/h1]
 Everything the Space Race needs, in one place. Press [b]Subscribe to all[/b] and the Ministry delivers the plugins, the cosmodrome and all five rockets, plus Republic Mod Loader, which runs the plugins.
 

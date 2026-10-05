@@ -28,6 +28,10 @@ The programme stays asleep until you research the *Rocket Research Institute*, s
 waits politely in any ordinary republic. An Early Start (1920) game reaches it by the
 1950s, which is plenty of time if the cement works cooperate.
 
+**On the Steam Workshop:** [Space Race: the complete programme](https://steamcommunity.com/sharedfiles/filedetails/?id=3814187744).
+Press *Subscribe to all* and the Ministry delivers the plugins, the kit, all five rockets and
+Republic Mod Loader.
+
 > **Status: under construction, like most of the republic.** Every feature below has run
 > in the game, but nobody has played the full race yet. Testers who would like to reach the
 > Moon before retirement may set `test_mode = 1` in `mod/plugins/spacerace/spacerace.ini`

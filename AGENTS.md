@@ -306,11 +306,12 @@ any sandbox**: from an AI agent's sandboxed shell `SteamAPI_Init` fails (the gam
 way), and the agent's auto mode treats uploads as publishing - both are the owner's permission
 settings to grant. Interfaces come from `SteamInternal_FindOrCreateUserInterface` (the SDK's own
 accessor route): the legacy `SteamClient()` + `SteamAPI_ISteamClient_GetISteam*` route returned a
-null interface with this DLL. Status 2026-10-05: `--check` and a `description` upload (the kit)
-verified against Steam by the owner; `preview`, `content`, `required` and `create` have not run
-yet. `collection` creates (first run; put the printed id in `COLLECTION_ID`) and fills the Steam
-collection from `workshop_collection()` in `space_workshop.py`: the seven items plus Republic Mod
-Loader, so players can "Subscribe to all"; its poster is `space_thumbs.py compose collection`
+null interface with this DLL. Status 2026-10-05, verified against Steam by the owner: `--check`,
+`description` (kit, main item), `collection` (CreateItem, title/description/preview/visibility,
+AddDependency - so the `create` and `required` code paths are proven too); `content` not yet.
+The Steam collection is **3814187744** (`COLLECTION_ID`), built from `workshop_collection()` in
+`space_workshop.py`: the seven items plus Republic Mod Loader, so players can "Subscribe to all";
+re-running `collection` updates it. Its poster is `space_thumbs.py compose collection`
 (gold COLLECTION sash), kept in build/thumbs/posters. Store pages show the README's pictures inline (`[img]` on raw.githubusercontent.com, branch
 `main` - `IMAGES` in `space_workshop.py`); Steam renders them.
 
