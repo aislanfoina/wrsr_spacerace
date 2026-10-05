@@ -53,7 +53,8 @@ KITDIR = argv[1] if len(argv) > 1 else 'mod/buildings/space_kit'
 PREVIEW = argv[2] if len(argv) > 2 else 'build/space'
 ONLY = set(argv[3].split(',')) if len(argv) > 3 and argv[3] else None
 INIS_ONLY = len(argv) > 4 and argv[4] == 'inis'
-ITEM_ID = 9000101
+from space_workshop import ITEMS, VISIBILITY  # noqa: E402
+ITEM_ID = ITEMS['kit'][1]
 import space_goods as G  # noqa: E402  (shared with space_scenario.py; G.USE_NEW_GOODS picks the variant being written)
 from space_goods import CLASS, good  # noqa: E402
 GOODS_INIS = os.path.join(os.path.dirname(TOOLS), 'mod', 'plugins', 'spacerace', 'data', 'goods_buildings')
@@ -842,7 +843,7 @@ def main():
         shutil.copy(os.path.join(TEXDIR, name + '.dds'), os.path.join(matdir, name + '.dds'))
     bmats = mmkit.blender_materials(TEXDIR, MATS)
     mmkit.lighting()
-    cfg = ['$ITEM_ID %d' % ITEM_ID, '', '$OWNER_ID 76561198165729857', '', '$ITEM_TYPE WORKSHOP_ITEMTYPE_BUILDING', '', '$VISIBILITY 2', '']
+    cfg = ['$ITEM_ID %d' % ITEM_ID, '', '$OWNER_ID 76561198165729857', '', '$ITEM_TYPE WORKSHOP_ITEMTYPE_BUILDING', '', '$VISIBILITY %d' % VISIBILITY, '']
     summary = []
     for key, fn in ASSETS:
         cfg.append('$OBJECT_BUILDING sr_%s' % key)

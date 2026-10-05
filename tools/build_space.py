@@ -1,7 +1,7 @@
 """Build every Space Race asset: textures, the building kit, the rockets, previews.
 
-    python tools/build_space.py              # textures kit vehicles previews
-    python tools/build_space.py kit          # one or more stages: textures | kit | inis | vehicles | previews | research | programme | deploy
+    python tools/build_space.py              # textures kit vehicles previews thumbs
+    python tools/build_space.py kit          # one or more stages: textures | kit | inis | vehicles | previews | thumbs | research | programme | deploy
     python tools/build_space.py kit pad_r7   # kit stage for some buildings only (comma separated keys)
 
 deploy copies the items into the game's workshop_wip (same as build_madmax.py);
@@ -49,7 +49,7 @@ def stage_vehicles(_=None):
 
 
 def stage_previews(_=None):
-    """Vehicle purchase previews (DXT5 .dds) and the workshop preview images."""
+    """Vehicle purchase previews (DXT5 .dds) and the kit's menu icons. The Workshop images are the thumbs stage's."""
     from PIL import Image
     sys.path.insert(0, os.path.join(ROOT, 'tools'))
     import tradepost_textures as tt
@@ -62,8 +62,6 @@ def stage_previews(_=None):
                          os.path.join(vdir, 'preview.dds'), 'DXT5')
         tt.save_dds_mips(Image.open(src + '_preview_side.png').convert('RGBA').resize((256, 128), Image.LANCZOS),
                          os.path.join(vdir, 'preview_side.dds'), 'DXT5')
-        Image.open(src + '_item.png').convert('RGB').resize((512, 512), Image.LANCZOS).save(
-            os.path.join(ROOT, 'mod/vehicles', key, 'previewimage.png'))
         print('previews ->', vdir)
     # the engine mirrors models left-right, so the menu icons are flipped to match the game;
     # a text chunk marks a flipped icon so running this stage again leaves it alone
@@ -74,19 +72,11 @@ def stage_previews(_=None):
         im = Image.open(icon)
         if im.info.get('sr_flipped') != '1':
             im.transpose(Image.FLIP_LEFT_RIGHT).save(icon, pnginfo=mark)
-    # the kit's workshop image: a 3 x 3 collage of the building renders
-    keys = ['pad_r7', 'pad_n1', 'mik', 'rocket_plant', 'test_stand', 'tracking', 'training', 'bureau', 'monument']
-    sheet = Image.new('RGB', (1536, 1536), (40, 40, 40))
-    for i, k in enumerate(keys):
-        p = os.path.join(ROOT, 'build/space', k + '.png')
-        if os.path.exists(p):
-            im = Image.open(p).convert('RGB')
-            w, h = im.size
-            side = min(w, h)
-            im = im.crop(((w - side) // 2, (h - side) // 2, (w + side) // 2, (h + side) // 2)).resize((512, 512), Image.LANCZOS).transpose(Image.FLIP_LEFT_RIGHT)
-            sheet.paste(im, ((i % 3) * 512, (i // 3) * 512))
-    sheet.resize((768, 768), Image.LANCZOS).save(os.path.join(ROOT, KIT, 'previewimage.png'))
-    print('kit preview ->', KIT)
+
+
+def stage_thumbs(_=None):
+    """The seven Workshop thumbnails (posters), each item's previewimage.png."""
+    run([PY, 'tools/space_thumbs.py'])
 
 
 def stage_research(_=None):
@@ -115,11 +105,11 @@ def stage_deploy(_=None):
 
 
 STAGES = {'textures': stage_textures, 'kit': stage_kit, 'inis': stage_inis, 'vehicles': stage_vehicles, 'previews': stage_previews,
-          'research': stage_research, 'programme': stage_programme, 'deploy': stage_deploy}
+          'thumbs': stage_thumbs, 'research': stage_research, 'programme': stage_programme, 'deploy': stage_deploy}
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    names = [a for a in args if a in STAGES] or ['textures', 'kit', 'vehicles', 'previews']
+    names = [a for a in args if a in STAGES] or ['textures', 'kit', 'vehicles', 'previews', 'thumbs']
     rest = [a for a in args if a not in STAGES]
     for n in names:
         STAGES[n](rest[0] if rest else None)
