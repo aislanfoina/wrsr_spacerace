@@ -304,9 +304,12 @@ while the game or RML runs, or when plugin-generated files are in the folder). `
 sign-in and differences from the live store pages without sending anything. **It must run outside
 any sandbox**: from an AI agent's sandboxed shell `SteamAPI_Init` fails (the game fails the same
 way), and the agent's auto mode treats uploads as publishing - both are the owner's permission
-settings to grant. Status 2026-10-05: written and compiled, not yet run against Steam; the first
-real run also confirms the result-struct sizes (`wait()` tries 16 then 8 bytes) and its post-check
-compares `time_updated` from the public API.
+settings to grant. Interfaces come from `SteamInternal_FindOrCreateUserInterface` (the SDK's own
+accessor route): the legacy `SteamClient()` + `SteamAPI_ISteamClient_GetISteam*` route returned a
+null interface with this DLL. Status 2026-10-05: `--check` verified against Steam by the owner
+(signed in, all seven items found, no differences); the upload, `required` and `create` paths have
+not run yet - the first real upload also confirms the result-struct size (`wait()` tries 16 then 8
+bytes), and its post-check compares `time_updated` from the public API.
 
 Workshop thumbnails: `tools/space_thumbs.py` (cut-outs rendered by `tools/space_thumb_scene.py`,
 composed with Pillow and the Oswald font) writes each item's `previewimage.png` (under 1 MB) and

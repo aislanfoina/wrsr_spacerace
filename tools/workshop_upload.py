@@ -159,6 +159,8 @@ class Strings(Structure):
 SIGNATURES = {
     'SteamAPI_Init': (c_bool, []), 'SteamAPI_Shutdown': (None, []), 'SteamAPI_RunCallbacks': (None, []),
     'SteamClient': (c_void_p, []), 'SteamAPI_GetHSteamUser': (c_int, []), 'SteamAPI_GetHSteamPipe': (c_int, []),
+    'SteamInternal_FindOrCreateUserInterface': (c_void_p, [c_int, c_char_p]),
+    'SteamInternal_CreateInterface': (c_void_p, [c_char_p]),
     'SteamAPI_ISteamClient_GetISteamUGC': (c_void_p, [c_void_p, c_int, c_int, c_char_p]),
     'SteamAPI_ISteamClient_GetISteamUtils': (c_void_p, [c_void_p, c_int, c_char_p]),
     'SteamAPI_ISteamClient_GetISteamUser': (c_void_p, [c_void_p, c_int, c_int, c_char_p]),
@@ -203,14 +205,34 @@ class Steam:
         if not ok:
             sys.exit('SteamAPI_Init failed. Steam must be running and signed in to the account that owns the game, and\n'
                      'this must run outside any sandbox (an AI agent\'s sandboxed shell cannot reach the Steam client).')
-        client = self.api.SteamClient()
         user, pipe = self.api.SteamAPI_GetHSteamUser(), self.api.SteamAPI_GetHSteamPipe()
-        self.ugc = self.api.SteamAPI_ISteamClient_GetISteamUGC(client, user, pipe, b'STEAMUGC_INTERFACE_VERSION012')
-        self.utils = self.api.SteamAPI_ISteamClient_GetISteamUtils(client, pipe, b'SteamUtils009')
-        su = self.api.SteamAPI_ISteamClient_GetISteamUser(client, user, pipe, b'SteamUser020')
-        if not (self.ugc and self.utils and su):
-            sys.exit('this steam_api64.dll lacks ISteamUGC v012 / ISteamUtils009 / ISteamUser020')
+        self.route = {}
+        self.ugc = self.interface('STEAMUGC_INTERFACE_VERSION012', user, pipe, 'GetISteamUGC')
+        self.utils = self.interface('SteamUtils009', user, pipe, 'GetISteamUtils')
+        su = self.interface('SteamUser020', user, pipe, 'GetISteamUser')
+        missing = [v for v, p in (('ISteamUGC v012', self.ugc), ('SteamUtils009', self.utils), ('SteamUser020', su)) if not p]
+        if missing:
+            sys.exit('Steam signed in (user %d, pipe %d) but would not hand out %s' % (user, pipe, ', '.join(missing)))
         self.steamid = self.api.SteamAPI_ISteamUser_GetSteamID(su)
+
+    def interface(self, version, user, pipe, getter):
+        """An interface pointer: the SDK's own accessor route first (what the game's inline SteamUGC() etc.
+        use), then ISteamClient's getters on the client versions this steam_api64.dll knows."""
+        v = version.encode()
+        p = self.api.SteamInternal_FindOrCreateUserInterface(user, v)
+        if p:
+            self.route[version] = 'FindOrCreateUserInterface'
+            return p
+        for name in ('SteamClient018', 'SteamClient017', None):
+            client = self.api.SteamInternal_CreateInterface(name.encode()) if name else self.api.SteamClient()
+            if not client:
+                continue
+            fn = getattr(self.api, 'SteamAPI_ISteamClient_' + getter)
+            p = fn(client, pipe, v) if getter == 'GetISteamUtils' else fn(client, user, pipe, v)
+            if p:
+                self.route[version] = '%s.%s' % (name or 'SteamClient()', getter)
+                return p
+        return None
 
     def close(self):
         self.api.SteamAPI_Shutdown()
@@ -280,6 +302,7 @@ def check(steam, packer, its, fields):
     owner = getattr(packer, 'OWNER', None)
     print('Steam: signed in as %d%s' % (steam.steamid, '' if owner is None else
                                        ' (the items\' owner)' if steam.steamid == owner else ' - NOT the owner %d' % owner))
+    print('       interfaces: ' + ', '.join('%s via %s' % kv for kv in steam.route.items()))
     pages = live([i['id'] for i in its])
     for i in its:
         page = pages.get(i['id'])
