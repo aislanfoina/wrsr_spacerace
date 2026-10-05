@@ -298,6 +298,11 @@ def result(code):
     return '%d %s' % (code, ERESULT.get(code, ''))
 
 
+def linked(code):
+    """AddDependency's answer: DuplicateRequest means the link was already there."""
+    return 'already there' if code == 29 else 'added' if code == 1 else result(code)
+
+
 LEGAL = 'accept the Workshop legal agreement first: https://steamcommunity.com/sharedfiles/workshoplegalagreement'
 
 
@@ -382,7 +387,7 @@ def collection(steam, packer, note):
                                visibility=STEAM_VISIBILITY[c['visibility']], note=note)
     print('collection %d page: %s%s' % (cid, result(code), ' - ' + LEGAL if legal else ''))
     for child in c['items']:
-        print('    + %d: %s' % (child, result(steam.require(cid, child))))
+        print('    + %d: %s' % (child, linked(steam.require(cid, child))))
     print('https://steamcommunity.com/sharedfiles/filedetails/?id=%d' % cid)
 
 
@@ -392,7 +397,7 @@ def required(steam, its):
             if not on_steam(i) or child < 100000000:
                 print('%s -> %s: not on Steam yet, skipped' % (i['key'], child))
                 continue
-            print('%s (%d) requires %d: %s' % (i['key'], i['id'], child, result(steam.require(i['id'], child))))
+            print('%s (%d) requires %d: %s' % (i['key'], i['id'], child, linked(steam.require(i['id'], child))))
 
 
 def main():

@@ -308,7 +308,9 @@ settings to grant. Interfaces come from `SteamInternal_FindOrCreateUserInterface
 accessor route): the legacy `SteamClient()` + `SteamAPI_ISteamClient_GetISteam*` route returned a
 null interface with this DLL. Status 2026-10-05, verified against Steam by the owner: `--check`,
 `description` (kit, main item), `collection` (CreateItem, title/description/preview/visibility,
-AddDependency - so the `create` and `required` code paths are proven too); `content` not yet.
+AddDependency) and `required` (the main item now requires the kit, the five rockets and RML;
+Steam answers 29 DuplicateRequest for a link that already exists, printed as "already there");
+`create` shares its code with `collection`; `content` has not run yet.
 The Steam collection is **3814187744** (`COLLECTION_ID`), built from `workshop_collection()` in
 `space_workshop.py`: the seven items plus Republic Mod Loader, so players can "Subscribe to all";
 re-running `collection` updates it. Its poster is `space_thumbs.py compose collection`
