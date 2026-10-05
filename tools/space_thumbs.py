@@ -2,6 +2,7 @@
 
     python tools/space_thumbs.py            # render the cut-outs in Blender, then compose
     python tools/space_thumbs.py compose    # compose from build/thumbs only
+    python tools/space_thumbs.py compose collection kit    # only these posters
 
 Renders the models with tools/space_thumb_scene.py (each rocket whole, top to bottom - a square
 crop of a standing rocket loses its nose or its engines), mirrors them the way the game shows models
@@ -93,9 +94,11 @@ def vignette(im, strength=0.45):
 
 
 def paper(im, seed=7):
-    """A faint print grain."""
-    random.seed(seed)
-    noise = Image.effect_noise((im.width // 4, im.height // 4), 28).resize(im.size, Image.BILINEAR)
+    """A faint print grain, the same on every run (so an unchanged poster stays byte for byte the same)."""
+    rnd = random.Random(seed)
+    w, h = im.width // 4, im.height // 4
+    noise = Image.frombytes('L', (w, h), bytes(min(255, max(0, int(rnd.gauss(128, 28)))) for _ in range(w * h)))
+    noise = noise.resize(im.size, Image.BILINEAR)
     grain = Image.merge('RGB', (noise, noise, noise))
     return Image.blend(im, grain, 0.05)
 
@@ -272,12 +275,23 @@ def rocket_poster(key):
     return finish(im, key)
 
 
-def package_poster():
+def sash(im, body):
+    """A gold band across the top right corner."""
+    f = font(46)
+    band = Image.new('RGBA', (620 * SS, 92 * SS), GOLD + (255,))
+    d = ImageDraw.Draw(band)
+    d.rectangle((0, 0, band.width - 1, band.height - 1), outline=INK, width=5 * SS)
+    d.text((band.width / 2, band.height / 2), body, font=f, fill=INK, anchor='mm')
+    band = band.rotate(-45, expand=True, resample=Image.BICUBIC)
+    put(im, band, SIZE - 150, 150, anchor='mm')
+
+
+def package_poster(key='package', tagline='BEAT APOLLO 11\nTO THE MOON', banner=None):
     im = Image.new('RGB', (W, W), RED)
     sunburst(im, (620, 1100), rays=30, turn=0.02)
     vignette(im)
     d = ImageDraw.Draw(im)
-    moon = (830, 190, 92)
+    moon = (830, 190, 92) if not banner else (700, 150, 80)
     cx, cy, r = s(*moon)
     d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=CREAM, outline=INK, width=5 * SS)
     for dx, dy, rr in ((-30, -20, 18), (25, 30, 13), (32, -32, 9), (-18, 40, 10)):   # craters
@@ -289,9 +303,11 @@ def package_poster():
     d = ImageDraw.Draw(im)
     text(d, (52, 40), 'SPACE\nRACE', font(196), offset=9, spacing=-38)
     y = ribbon(d, (68, 482), 'КОСМИЧЕСКАЯ ГОНКА', font(40, 'SemiBold'))
-    text(d, (56, y + 22), 'BEAT APOLLO 11\nTO THE MOON', font(46, 'SemiBold'), offset=4, spacing=2)
+    text(d, (56, y + 22), tagline, font(46, 'SemiBold'), offset=4, spacing=2)
     stamp(im, (178, 762), 86, ' SPACE RACE · МОД · 1957–1969 ·', '1.1.1.9')
-    return finish(im, 'package')
+    if banner:
+        sash(im, banner)
+    return finish(im, key)
 
 
 def kit_poster():
@@ -316,14 +332,19 @@ def kit_poster():
     return finish(im, 'kit')
 
 
-def compose():
-    paths = {'package': package_poster(), 'kit': kit_poster()}
-    for key in ROCKETS:
-        paths[key] = rocket_poster(key)
+POSTER = {'package': package_poster, 'kit': kit_poster,
+          # the Steam collection of every item (tools/workshop_upload.py collection); no item folder of its own
+          'collection': lambda: package_poster('collection', 'THE COMPLETE\nPROGRAMME', banner='COLLECTION')}
+POSTER.update((k, (lambda k=k: rocket_poster(k))) for k in ROCKETS)
+
+
+def compose(keys=None):
+    paths = {key: make() for key, make in POSTER.items() if not keys or key in keys}
     for key, path in paths.items():
-        shutil.copyfile(path, os.path.join(ROOT, TARGETS[key], 'previewimage.png'))
+        if key in TARGETS:
+            shutil.copyfile(path, os.path.join(ROOT, TARGETS[key], 'previewimage.png'))
     sheet = Image.new('RGB', (3 * 520, 3 * 520), INK)
-    for i, key in enumerate(paths):
+    for i, key in enumerate(list(paths)[:9]):
         sheet.paste(Image.open(paths[key]).convert('RGB').resize((512, 512), Image.LANCZOS), (4 + 520 * (i % 3), 4 + 520 * (i // 3)))
     sheet.save(os.path.join(POSTERS, '_sheet.png'))
 
@@ -337,4 +358,4 @@ def render():
 if __name__ == '__main__':
     if sys.argv[1:2] != ['compose']:
         render()
-    compose()
+    compose(set(sys.argv[2:]) or None)

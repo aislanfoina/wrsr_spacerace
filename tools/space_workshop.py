@@ -160,6 +160,35 @@ def descriptions():
 # Required Items on Steam: item -> the items (keys here, or Steam ids) a subscriber also needs
 REQUIRED = {'package': ['kit'] + list(ROCKETS) + [3787969749]}
 
+# The Steam collection of every item plus the loader, so "Subscribe to all" brings the lot.
+# 0 until tools/workshop_upload.py creates it; then its id goes here.
+COLLECTION_ID = 0
+COLLECTION = '''[h1]COMRADE, THE WHOLE PROGRAMME COMES IN ONE CRATE.[/h1]
+Everything the Space Race needs, in one place. Press [b]Subscribe to all[/b] and the Ministry delivers the plugins, the cosmodrome and all five rockets, plus Republic Mod Loader, which runs the plugins.
+
+[img]%(img)srockets.jpg[/img]
+
+[list]
+[*][url=%(package)s]Space Race [1.1.1.9][/url]: the plugins. The research branch, the launches, cosmonauts and the programme against the American timeline. Start here: its page explains how to play.
+[*][url=%(kit)s]Space Race Kit[/url]: the sixteen buildings, from Gagarin's Start to the Gagarin column.
+[*]The rockets: [url=%(sr_sputnik)s]R-7 Sputnik[/url], [url=%(sr_vostok)s]Vostok-K[/url], [url=%(sr_soyuz)s]Soyuz[/url], [url=%(sr_proton)s]Proton[/url] and [url=%(sr_n1)s]N1-L3[/url].
+[*][url=%(rml)s]Republic Mod Loader[/url] by UltimateUniverse: runs the plugins.
+[/list]
+Then run Republic Mod Loader, enable the Space Race items and their plugins (spacerace, experts, resources), and launch. Requires Workers & Resources: Soviet Republic [b]1.1.1.9[/b].
+
+'''
+
+
+def workshop_collection():
+    """The collection as tools/workshop_upload.py reads it: Steam id (0 = not created yet), title, store
+    page text, preview image, the game's visibility value and the Steam ids it holds, in order."""
+    urls = dict((k, ITEM_URL % v[1]) for k, v in ITEMS.items())
+    urls.update(img=IMAGES, rml=RML)
+    return {'id': COLLECTION_ID, 'title': 'Space Race [1.1.1.9]: the complete programme',
+            'description': COLLECTION % urls + FOOTER, 'visibility': VISIBILITY,
+            'preview': os.path.join(ROOT, 'build', 'thumbs', 'posters', 'collection.png'),
+            'items': [v[1] for v in ITEMS.values()] + [3787969749]}
+
 
 def workshop_items():
     """The items as tools/workshop_upload.py reads them: key, Steam id, game item type, title,

@@ -5,6 +5,7 @@
     python tools/workshop_upload.py space_race content --only kit,sr_n1 --note "Fix the N1 pad"
     python tools/workshop_upload.py space_race required                       # Required Items on the main item
     python tools/workshop_upload.py republic_in_ruins create --only words     # new items; prints their ids
+    python tools/workshop_upload.py space_race collection                     # the collection of all items
 
 Mods: space_race (tools/space_workshop.py), republic_in_ruins (tools/yearzero_workshop.py); each
 packer's workshop_items() is the source of truth for ids, titles, store pages, visibility and
@@ -20,6 +21,8 @@ Actions:
   required     add the packer's Required Items (existing ones stay)
   create       create the items that still have local ids (9000xxx) with the game's type tag,
                private; put the printed ids in the packer, rebuild, install, then upload content
+  collection   the packer's workshop_collection(): created on first use (put the printed id in the
+               packer), then its page is set and its items added - "Subscribe to all" for players
   --check      sign-in, ids and what differs from the live store pages; touches nothing on Steam
 
 It loads the game's own steam_api64.dll (Steamworks flat API, ISteamUGC v012) as app 784150, so
@@ -47,6 +50,7 @@ WIP = os.path.join(GAME, 'media_soviet', 'workshop_wip')
 APP = 784150
 MODS = {'space_race': 'space_workshop', 'republic_in_ruins': 'yearzero_workshop'}
 FIELDS = ('title', 'description', 'preview', 'content', 'visibility')
+ACTIONS = ('required', 'create', 'collection')
 
 # the tag the game gives each item type on Steam (its in-game browser filters by it)
 TYPE_TAG = {'WORKSHOP_ITEMTYPE_SCRIPT': 'Script', 'WORKSHOP_ITEMTYPE_BUILDING': 'Building',
@@ -280,8 +284,9 @@ class Steam:
         raw = self.wait(call, CB_SUBMIT, (16, 8), handle=h)
         return int.from_bytes(raw[0:4], 'little'), raw[4] != 0          # EResult, needs the legal agreement
 
-    def create(self):
-        raw = self.wait(self.api.SteamAPI_ISteamUGC_CreateItem(self.ugc, APP, 0), CB_CREATE, (24,))   # 0 = community item
+    def create(self, filetype=0):
+        """filetype: Steam's EWorkshopFileType, 0 community item, 2 collection."""
+        raw = self.wait(self.api.SteamAPI_ISteamUGC_CreateItem(self.ugc, APP, filetype), CB_CREATE, (24,))
         return int.from_bytes(raw[0:4], 'little'), int.from_bytes(raw[8:16], 'little'), raw[16] != 0
 
     def require(self, parent, child):
@@ -360,6 +365,27 @@ def create(steam, its):
     print('Put the new ids in the packer\'s ITEMS, regenerate, run build.ps1 -Install, then upload "content visibility".')
 
 
+def collection(steam, packer, note):
+    """Creates the packer's collection if it has no id yet, sets its page, then adds its items in order
+    (for a collection, AddDependency adds the item to it; items already in it stay)."""
+    c = packer.workshop_collection()
+    if len(c['description']) >= 8000 or not os.path.exists(c['preview']) or os.path.getsize(c['preview']) >= 1 << 20:
+        sys.exit('collection: the description must stay under 8000 characters and %s exist under 1 MB '
+                 '(python tools/space_thumbs.py compose collection)' % c['preview'])
+    cid = c['id']
+    if not cid:
+        code, cid, legal = steam.create(2)
+        if code != 1:
+            sys.exit('CreateItem (collection) %s%s' % (result(code), ' - ' + LEGAL if legal else ''))
+        print('collection created: %d - put COLLECTION_ID = %d in %s.py' % (cid, cid, packer.__name__))
+    code, legal = steam.update(cid, title=c['title'], description=c['description'], preview=c['preview'],
+                               visibility=STEAM_VISIBILITY[c['visibility']], note=note)
+    print('collection %d page: %s%s' % (cid, result(code), ' - ' + LEGAL if legal else ''))
+    for child in c['items']:
+        print('    + %d: %s' % (child, result(steam.require(cid, child))))
+    print('https://steamcommunity.com/sharedfiles/filedetails/?id=%d' % cid)
+
+
 def required(steam, its):
     for i in its:
         for child in i['required']:
@@ -372,15 +398,15 @@ def required(steam, its):
 def main():
     ap = argparse.ArgumentParser(description='Steam Workshop items of the mods, without the game.')
     ap.add_argument('mod', choices=sorted(MODS))
-    ap.add_argument('what', nargs='*', help='fields (%s, all) or one action (required, create)' % ', '.join(FIELDS))
+    ap.add_argument('what', nargs='*', help='fields (%s, all) or one action (%s)' % (', '.join(FIELDS), ', '.join(ACTIONS)))
     ap.add_argument('--only', help='comma-separated item keys')
     ap.add_argument('--note', default='', help='change note shown on the item\'s Change Notes tab')
     ap.add_argument('--check', action='store_true', help='report only; nothing is sent to Steam')
     a = ap.parse_args()
     what = list(FIELDS) if 'all' in a.what else a.what
-    actions = [w for w in what if w in ('required', 'create')]
+    actions = [w for w in what if w in ACTIONS]
     fields = [w for w in what if w in FIELDS]
-    bad = [w for w in what if w not in FIELDS + ('required', 'create')]
+    bad = [w for w in what if w not in FIELDS + ACTIONS]
     if bad or (actions and (fields or len(actions) > 1)) or not (what or a.check):
         ap.error('give fields to upload, or one action, or --check')
     packer, its = items(a.mod, a.only)
@@ -401,6 +427,8 @@ def main():
             create(steam, its)
         elif actions == ['required']:
             required(steam, its)
+        elif actions == ['collection']:
+            collection(steam, packer, a.note or 'Updated with tools/workshop_upload.py')
         else:
             upload(steam, its, fields, a.note or 'Updated: ' + ', '.join(fields))
     finally:
