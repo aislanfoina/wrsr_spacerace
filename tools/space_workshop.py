@@ -1,34 +1,41 @@
 """The Space Race's seven Steam Workshop items: ids, names and store-page descriptions (Steam BBCode).
 
     python tools/space_workshop.py
+    python tools/space_workshop.py new     # preview + description files for the game's "create new item" form
 
 Rewrites workshopconfig.ini of the package (plugins), the building kit and the five rockets, and
 spacerace.ini's kit_item, from ITEMS below. Run it after tools/build_space.py (the kit and vehicle
 stages write their own short configs).
 
-Publishing (the game's uploader: main menu -> Workshop). A new item is created in the game first,
-which gives it its Steam id and a media_soviet/workshop_wip/<id> folder; put that id in ITEMS,
-run this, then `build.ps1 -Install` fills the folders and the game uploads them. $VISIBILITY is
-Steam's: 0 public, 1 friends only, 2 private, 3 unlisted.
+Publishing (the game's uploader: main menu -> Workshop -> Your items (WIP)). A new item is created
+in the game first with the green +, which asks for a preview PNG (under 1 MB), a name and a UTF-8
+TXT description (`new` writes them to build/workshop_new/space_race) and gives the item its Steam
+id and a media_soviet/workshop_wip/<id> folder; put that id in ITEMS, run this, then
+`build.ps1 -Install` fills the folders and the game uploads them. $VISIBILITY is the game's, not
+Steam's: 0 unpublished, 1 friends only, 2 PUBLIC (what 71 of 81 published items carry).
 """
 import os
 import re
+import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OWNER = 76561198165729857
-VISIBILITY = 2
+VISIBILITY = 2                  # public (the items went public on 2026-10-05); 0 would hide them on the next upload
 REPO = 'https://github.com/aislanfoina/wrsr_spacerace'
-RML = 'https://steamcommunity.com/sharedfiles/filedetails/?id=3787969749'
+ITEM_URL = 'https://steamcommunity.com/sharedfiles/filedetails/?id=%d'
+# the README's pictures, inline on the store pages ([img]); main only changes after review, so the links hold
+IMAGES = REPO.replace('https://github.com/', 'https://raw.githubusercontent.com/') + '/main/docs/images/'
+RML = ITEM_URL % 3787969749
 
-# key: (folder, item id, item type, name). Local development ids (90001xx) until the items exist on Steam.
+# key: (folder, Steam item id, item type, name). Created in the game on 2026-10-05 (dev ids were 90001xx).
 ITEMS = {
-    'package': ('mod/packages/space_race', 9000100, 'WORKSHOP_ITEMTYPE_SCRIPT', 'Space Race [1.1.1.9]'),
-    'kit': ('mod/buildings/space_kit', 9000101, 'WORKSHOP_ITEMTYPE_BUILDING', 'Space Race Kit'),
-    'sr_sputnik': ('mod/vehicles/sr_sputnik', 9000111, 'WORKSHOP_ITEMTYPE_VEHICLE', 'Space Race: R-7 Sputnik'),
-    'sr_vostok': ('mod/vehicles/sr_vostok', 9000112, 'WORKSHOP_ITEMTYPE_VEHICLE', 'Space Race: Vostok-K'),
-    'sr_soyuz': ('mod/vehicles/sr_soyuz', 9000113, 'WORKSHOP_ITEMTYPE_VEHICLE', 'Space Race: Soyuz'),
-    'sr_proton': ('mod/vehicles/sr_proton', 9000114, 'WORKSHOP_ITEMTYPE_VEHICLE', 'Space Race: Proton'),
-    'sr_n1': ('mod/vehicles/sr_n1', 9000115, 'WORKSHOP_ITEMTYPE_VEHICLE', 'Space Race: N1-L3'),
+    'package': ('mod/packages/space_race', 3814051864, 'WORKSHOP_ITEMTYPE_SCRIPT', 'Space Race [1.1.1.9]'),
+    'kit': ('mod/buildings/space_kit', 3814049784, 'WORKSHOP_ITEMTYPE_BUILDING', 'Space Race Kit'),
+    'sr_sputnik': ('mod/vehicles/sr_sputnik', 3814050253, 'WORKSHOP_ITEMTYPE_VEHICLE', 'Space Race: R-7 Sputnik'),
+    'sr_vostok': ('mod/vehicles/sr_vostok', 3814050457, 'WORKSHOP_ITEMTYPE_VEHICLE', 'Space Race: Vostok-K'),
+    'sr_soyuz': ('mod/vehicles/sr_soyuz', 3814052488, 'WORKSHOP_ITEMTYPE_VEHICLE', 'Space Race: Soyuz'),
+    'sr_proton': ('mod/vehicles/sr_proton', 3814050971, 'WORKSHOP_ITEMTYPE_VEHICLE', 'Space Race: Proton'),
+    'sr_n1': ('mod/vehicles/sr_n1', 3814051385, 'WORKSHOP_ITEMTYPE_VEHICLE', 'Space Race: N1-L3'),
 }
 KIT_OBJECTS = ('pad_r7', 'pad_n1', 'mik', 'rocket_plant', 'engine_plant', 'test_stand', 'lox_plant', 'propellant',
                'instruments', 'spacecraft', 'tracking', 'training', 'bureau', 'recovery', 'monument', 'gagarin')
@@ -49,6 +56,9 @@ The Ministry of General Machine Building (a name chosen so that nobody would gue
 
 The objective is simple: [b]put a Soviet cosmonaut on the Moon before 20 July 1969.[/b] The Americans have a head start, a larger budget and Apollo 11. You have kerosene, liquid oxygen and a Five-Year Plan.
 
+[img]%(img)scosmodrome.jpg[/img]
+[i]A cosmodrome in an ordinary republic. The Americans have not been told.[/i]
+
 [h2]WHAT THE STATE HAS APPROVED[/h2]
 [list]
 [*][b]A space branch in the research tree[/b]: 17 entries from 1946 to 1966, each unlocking its buildings.
@@ -61,6 +71,12 @@ The objective is simple: [b]put a Soviet cosmonaut on the Moon before 20 July 19
 [/list]
 The programme sleeps until you research the Rocket Research Institute, so it waits politely in any ordinary republic.
 
+[img]%(img)sbuildings.jpg[/img]
+[i]The sixteen buildings of the Space Race Kit.[/i]
+
+[img]%(img)srockets.jpg[/img]
+[i]R-7 Sputnik, Vostok-K, Soyuz, Proton and the N1, with a comrade for scale. The N1 needs the heavy complex; the others launch from Gagarin's Start.[/i]
+
 [h2]HOW TO JOIN THE RACE[/h2]
 [olist]
 [*]Subscribe to this item, the [b]Space Race Kit[/b] and the five rockets (the Required Items on this page), and to [url=%(rml)s]Republic Mod Loader[/url].
@@ -68,6 +84,9 @@ The programme sleeps until you research the Rocket Research Institute, so it wai
 [*]Load your republic or start a new one. Research the Rocket Research Institute and the programme takes it from there.
 [/olist]
 Requires Workers & Resources: Soviet Republic [b]1.1.1.9[/b]: the plugins patch this exact build.
+
+[img]%(img)spad_r7.jpg[/img]
+[i]A Vostok-K in the arms of Gagarin's Start.[/i]
 
 [h2]SAVES[/h2]
 Out of the box ([b]new_goods = 0[/b]) the mod adds no goods, and your existing republic can join the race as it is: liquid oxygen travels as chemicals, rocket parts as mechanical components and spacecraft as electronics. The six new goods ([b]new_goods = 1[/b]) can be switched on for an existing republic too: load it and they join the economy. Switched off again, whatever is in stock becomes its stand-in and the next save is a plain one. Save once after each switch, and keep a backup: the Party always does.
@@ -81,21 +100,40 @@ Early access. Every feature has run in the game, but nobody has played the whole
 [h2]REPORTING A LAUNCH FAILURE[/h2]
 Tell us what happened, what you were doing, and attach the Republic Mod Loader log. Unlike TASS, we want to hear about failures.
 
-''' % {'rml': RML} + FOOTER + '''
+[img]%(img)spad_n1.jpg[/img]
+[i]The N1 on Site 110. Historically: four launches, four explosions, zero press releases.[/i]
+
+''' % {'rml': RML, 'img': IMAGES} + FOOTER + '''
 
 [b]Build the rockets. Train the cosmonauts. Beat Apollo 11. The Motherland is watching, Comrade, and so, unfortunately, are the Americans.[/b]'''
 
 KIT = '''[h1]COMRADE, A COSMODROME DOES NOT BUILD ITSELF.[/h1]
-It does, however, come as a kit. Sixteen buildings of the Soviet space programme, modelled on the real ones:
+It does, however, come as a kit. Sixteen buildings of the Soviet space programme, modelled on the real ones.
+
+[img]%(img)scosmodrome.jpg[/img]
+[i]A cosmodrome in an ordinary republic. The Americans have not been told.[/i]
+
 [list]
 [*][b]Launch[/b]: the R-7 launch complex (Gagarin's Start), the N1 heavy complex (Site 110) and the MIK assembly building.
 [*][b]Rockets and parts[/b]: the Progress rocket plant, the OKB-456 engine works, an engine test stand, the oxygen-nitrogen plant, a propellant plant, instrument works and a spacecraft assembly hall.
 [*][b]Flight and crew[/b]: the Pluton deep space tracking station, Star City, OKB-1 and a landing and recovery field.
 [*][b]Glory[/b]: the Monument to the Conquerors of Space and the Gagarin column.
 [/list]
-Part of the [b]Space Race[/b]: subscribe to the Space Race item too, which unlocks these buildings through its research branch and makes the rockets fly. See that item for how to play.
 
-''' + FOOTER
+[img]%(img)sbuildings.jpg[/img]
+
+[h2]THE LAUNCH COMPLEXES[/h2]
+The MIK rolls each finished rocket out onto the pad it is linked to. The N1 needs the heavy complex; the others launch from Gagarin's Start. No amount of pushing will fit an N1 onto an R-7 pad.
+
+[img]%(img)spad_r7.jpg[/img]
+[i]A Vostok-K in the arms of Gagarin's Start.[/i]
+
+[img]%(img)spad_n1.jpg[/img]
+[i]The N1 on Site 110. Historically: four launches, four explosions, zero press releases.[/i]
+
+Part of the [b]Space Race[/b]: subscribe to [url=%(main)s]the Space Race item[/url] too, which unlocks these buildings through its research branch and makes the rockets fly. See that item for how to play.
+
+''' % {'img': IMAGES, 'main': ITEM_URL % ITEMS['package'][1]} + FOOTER
 
 ROCKETS = {
     'sr_sputnik': 'The Semyorka that opened the space age: Sputnik 1 on 4 October 1957, Laika a month later. Flies the first two milestones from the R-7 launch complex.',
@@ -108,8 +146,56 @@ ROCKETS = {
 
 def rocket_desc(key):
     return ('[h1]%s[/h1]\n%s\n\nBuilt at the MIK from rocket stages, engines and avionics, rolled out onto its launch pad and '
-            'launched by the Space Race programme. Part of the [b]Space Race[/b]: subscribe to the Space Race item and the '
-            'Space Race Kit too.\n\n' % (ITEMS[key][3].replace('Space Race: ', ''), ROCKETS[key])) + FOOTER
+            'launched by the Space Race programme. Part of the [b]Space Race[/b]: subscribe to [url=%s]the Space Race item[/url] '
+            'and [url=%s]the Space Race Kit[/url] too.\n\n'
+            % (ITEMS[key][3].replace('Space Race: ', ''), ROCKETS[key], ITEM_URL % ITEMS['package'][1], ITEM_URL % ITEMS['kit'][1])) + FOOTER
+
+
+def descriptions():
+    d = {'package': PACKAGE, 'kit': KIT}
+    d.update((k, rocket_desc(k)) for k in ROCKETS)
+    return d
+
+
+# Required Items on Steam: item -> the items (keys here, or Steam ids) a subscriber also needs
+REQUIRED = {'package': ['kit'] + list(ROCKETS) + [3787969749]}
+
+# The Steam collection of every item plus the loader, so "Subscribe to all" brings the lot.
+# 0 until tools/workshop_upload.py creates it; then its id goes here (created 2026-10-05).
+COLLECTION_ID = 3814187744
+COLLECTION = '''[h1]COMRADE, THE WHOLE PROGRAMME COMES IN ONE CRATE.[/h1]
+Everything the Space Race needs, in one place. Press [b]Subscribe to all[/b] and the Ministry delivers the plugins, the cosmodrome and all five rockets, plus Republic Mod Loader, which runs the plugins.
+
+[img]%(img)srockets.jpg[/img]
+
+[list]
+[*][url=%(package)s]Space Race [1.1.1.9][/url]: the plugins. The research branch, the launches, cosmonauts and the programme against the American timeline. Start here: its page explains how to play.
+[*][url=%(kit)s]Space Race Kit[/url]: the sixteen buildings, from Gagarin's Start to the Gagarin column.
+[*]The rockets: [url=%(sr_sputnik)s]R-7 Sputnik[/url], [url=%(sr_vostok)s]Vostok-K[/url], [url=%(sr_soyuz)s]Soyuz[/url], [url=%(sr_proton)s]Proton[/url] and [url=%(sr_n1)s]N1-L3[/url].
+[*][url=%(rml)s]Republic Mod Loader[/url] by UltimateUniverse: runs the plugins.
+[/list]
+Then run Republic Mod Loader, enable the Space Race items and their plugins (spacerace, experts, resources), and launch. Requires Workers & Resources: Soviet Republic [b]1.1.1.9[/b].
+
+'''
+
+
+def workshop_collection():
+    """The collection as tools/workshop_upload.py reads it: Steam id (0 = not created yet), title, store
+    page text, preview image, the game's visibility value and the Steam ids it holds, in order."""
+    urls = dict((k, ITEM_URL % v[1]) for k, v in ITEMS.items())
+    urls.update(img=IMAGES, rml=RML)
+    return {'id': COLLECTION_ID, 'title': 'Space Race [1.1.1.9]: the complete programme',
+            'description': COLLECTION % urls + FOOTER, 'visibility': VISIBILITY,
+            'preview': os.path.join(ROOT, 'build', 'thumbs', 'posters', 'collection.png'),
+            'items': [v[1] for v in ITEMS.values()] + [3787969749]}
+
+
+def workshop_items():
+    """The items as tools/workshop_upload.py reads them: key, Steam id, game item type, title,
+    store page text, the game's visibility value and Required Items (Steam ids)."""
+    descs = descriptions()
+    return [{'key': k, 'id': v[1], 'type': v[2], 'title': v[3], 'description': descs[k], 'visibility': VISIBILITY,
+             'required': [ITEMS[r][1] if r in ITEMS else r for r in REQUIRED.get(k, [])]} for k, v in ITEMS.items()]
 
 
 def config(key, desc, objects):
@@ -124,11 +210,34 @@ def config(key, desc, objects):
     print('%-11s %d  %-28s %5d chars  %s' % (key, item, name, len(desc), os.path.relpath(path, ROOT)))
 
 
+def new_items(out):
+    """What the game's "create new item" form asks for, one PNG + one UTF-8 TXT per item, numbered in upload order."""
+    import shutil
+    os.makedirs(out, exist_ok=True)
+    descs = descriptions()
+    order = ['kit'] + list(ROCKETS) + ['package']
+    lines = ['Create each item in the game (Workshop -> Your items (WIP) -> green +), visibility Unpublished:', '']
+    for n, key in enumerate(order, 1):
+        folder, _item, typ, name = ITEMS[key]
+        base = '%d_%s' % (n, key)
+        png = os.path.join(ROOT, folder, 'previewimage.png')
+        assert os.path.getsize(png) < 1 << 20, '%s: the game refuses previews of 1 MB or more' % key
+        shutil.copy2(png, os.path.join(out, base + '.png'))
+        open(os.path.join(out, base + '.txt'), 'w', encoding='utf-8', newline='').write(descs[key].replace('\n', '\r\n'))
+        lines.append('%d. %-26s type %-8s image %s.png  description %s.txt'
+                     % (n, name, typ.replace('WORKSHOP_ITEMTYPE_', '').title(), base, base))
+    open(os.path.join(out, 'ITEMS.txt'), 'w', encoding='utf-8', newline='').write('\r\n'.join(lines + ['']))
+    print('\n'.join(lines) + '\n-> ' + out)
+
+
 def main():
-    config('package', PACKAGE, [])
-    config('kit', KIT, ['$OBJECT_BUILDING sr_%s' % k for k in KIT_OBJECTS])
+    if sys.argv[1:2] == ['new']:
+        return new_items(os.path.join(ROOT, 'build', 'workshop_new', 'space_race'))
+    descs = descriptions()
+    config('package', descs['package'], [])
+    config('kit', descs['kit'], ['$OBJECT_BUILDING sr_%s' % k for k in KIT_OBJECTS])
     for key in ROCKETS:
-        config(key, rocket_desc(key), ['$OBJECT_VEHICLE %s' % key])
+        config(key, descs[key], ['$OBJECT_VEHICLE %s' % key])
     # the research branch unlocks the kit's buildings by its item id
     ini = os.path.join(ROOT, 'mod', 'plugins', 'spacerace', 'spacerace.ini')
     text = open(ini, encoding='utf-8', newline='').read()

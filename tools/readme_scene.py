@@ -45,7 +45,7 @@ def rocket_fns():
 
 # ------------------------------------------------------------------ world --
 
-def sky():
+def sky(horizon=HORIZON, zenith=ZENITH):
     """A gradient sky: haze at the horizon, blue overhead. The terrain fades into the same haze."""
     w = bpy.context.scene.world
     nt = w.node_tree
@@ -58,9 +58,9 @@ def sky():
     nt.links.new(coord.outputs['Generated'], sep.inputs[0])
     nt.links.new(sep.outputs['Z'], ramp.inputs['Fac'])
     ramp.color_ramp.elements[0].position = 0.0
-    ramp.color_ramp.elements[0].color = HORIZON + (1.0,)
+    ramp.color_ramp.elements[0].color = tuple(horizon) + (1.0,)
     ramp.color_ramp.elements[1].position = 0.45
-    ramp.color_ramp.elements[1].color = ZENITH + (1.0,)
+    ramp.color_ramp.elements[1].color = tuple(zenith) + (1.0,)
     nt.links.new(ramp.outputs['Color'], bg.inputs['Color'])
     bg.inputs['Strength'].default_value = 1.0
     nt.links.new(bg.outputs['Background'], out.inputs['Surface'])
@@ -70,8 +70,12 @@ def socket(sockets, name, kind):
     return [s for s in sockets if s.name == name and s.type == kind][0]
 
 
-def terrain(size=12000.0):
-    """The map: grass and dry steppe in broad patches, fine bumps, fading into haze with distance."""
+GRASS = [(0.30, (0.06, 0.12, 0.03)), (0.50, (0.10, 0.17, 0.04)), (0.63, (0.18, 0.22, 0.07)), (0.74, (0.30, 0.27, 0.11))]
+
+
+def terrain(size=12000.0, colors=GRASS, haze_color=HORIZON):
+    """The map: grass and dry steppe in broad patches, fine bumps, fading into haze with distance.
+    colors: four (position, rgb) stops of the patch ramp."""
     me = bpy.data.meshes.new('terrain')
     h = size / 2
     me.from_pydata([(-h, -h, 0.0), (h, -h, 0.0), (h, h, 0.0), (-h, h, 0.0)], [], [(0, 1, 2, 3)])
@@ -88,12 +92,11 @@ def terrain(size=12000.0):
     nt.links.new(tc.outputs['Object'], patch.inputs['Vector'])
     ramp = nt.nodes.new('ShaderNodeValToRGB')
     cr = ramp.color_ramp
-    cr.elements[0].position, cr.elements[0].color = 0.30, (0.06, 0.12, 0.03, 1.0)
-    cr.elements[1].position, cr.elements[1].color = 0.74, (0.30, 0.27, 0.11, 1.0)
-    e = cr.elements.new(0.50)
-    e.color = (0.10, 0.17, 0.04, 1.0)
-    e = cr.elements.new(0.63)
-    e.color = (0.18, 0.22, 0.07, 1.0)
+    cr.elements[0].position, cr.elements[0].color = colors[0][0], tuple(colors[0][1]) + (1.0,)
+    cr.elements[1].position, cr.elements[1].color = colors[3][0], tuple(colors[3][1]) + (1.0,)
+    for pos, rgb in colors[1:3]:
+        e = cr.elements.new(pos)
+        e.color = tuple(rgb) + (1.0,)
     nt.links.new(patch.outputs['Fac'], ramp.inputs['Fac'])
     nt.links.new(ramp.outputs['Color'], bsdf.inputs['Base Color'])
     fine = nt.nodes.new('ShaderNodeTexNoise')
@@ -113,7 +116,7 @@ def terrain(size=12000.0):
     rng.inputs['To Max'].default_value = 0.9
     nt.links.new(cam.outputs['View Distance'], rng.inputs['Value'])
     haze = nt.nodes.new('ShaderNodeEmission')
-    haze.inputs['Color'].default_value = HORIZON + (1.0,)
+    haze.inputs['Color'].default_value = tuple(haze_color) + (1.0,)
     haze.inputs['Strength'].default_value = 1.0
     mix = nt.nodes.new('ShaderNodeMixShader')
     nt.links.new(rng.outputs['Result'], mix.inputs['Fac'])
@@ -348,4 +351,5 @@ def main():
             fn()
 
 
-main()
+if __name__ == '__main__':      # the Year Zero README scenes import the helpers above
+    main()

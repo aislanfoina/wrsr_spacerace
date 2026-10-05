@@ -168,6 +168,8 @@ class Builder:
         self._finish(bm, ret, mat, True)
 
     def text(self, mat, body, pos, size, extrude, yaw=0.0):
+        """Raised lettering, built mirrored left-right: the engine shows every model mirrored
+        (found in game with the Space Race kit, 2026-09-29), so it reads correctly there."""
         cu = bpy.data.curves.new('sign', 'FONT')
         cu.body = body
         cu.size = size
@@ -178,12 +180,12 @@ class Builder:
         bpy.context.scene.collection.objects.link(ob)
         dg = bpy.context.evaluated_depsgraph_get()
         me = ob.evaluated_get(dg).to_mesh()
-        M = Matrix.Translation(G(*pos)) @ rot(yaw=yaw) @ Matrix.Rotation(math.radians(90), 4, 'X')
+        M = Matrix.Translation(G(*pos)) @ rot(yaw=yaw) @ Matrix.Rotation(math.radians(90), 4, 'X') @ Matrix.Diagonal((-1.0, 1.0, 1.0, 1.0))
         bm = self.master[mat]
         vmap = {v.index: bm.verts.new(M @ v.co) for v in me.vertices}
         for p in me.polygons:
             try:
-                f = bm.faces.new([vmap[i] for i in p.vertices])
+                f = bm.faces.new([vmap[i] for i in reversed(p.vertices)])     # the mirror flips the winding
                 f.material_index = mat
                 f.smooth = False
             except ValueError:

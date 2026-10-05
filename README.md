@@ -28,10 +28,14 @@ The programme stays asleep until you research the *Rocket Research Institute*, s
 waits politely in any ordinary republic. An Early Start (1920) game reaches it by the
 1950s, which is plenty of time if the cement works cooperate.
 
+**On the Steam Workshop:** [Space Race: the complete programme](https://steamcommunity.com/sharedfiles/filedetails/?id=3814187744).
+Press *Subscribe to all* and the Ministry delivers the plugins, the kit, all five rockets and
+Republic Mod Loader.
+
 > **Status: under construction, like most of the republic.** Every feature below has run
-> in the game, but nobody has played the full race yet. `mod/plugins/spacerace/spacerace.ini`
-> ships with `test_mode = 1` (space research at 5 % of its cost) so that the testers could
-> reach the Moon before retirement. Set it to `0` for a real Five-Year Plan.
+> in the game, but nobody has played the full race yet. Testers who would like to reach the
+> Moon before retirement may set `test_mode = 1` in `mod/plugins/spacerace/spacerace.ini`
+> (space research at 5 % of its cost, no year limits).
 
 ## WHAT THE STATE HAS APPROVED
 
@@ -178,17 +182,23 @@ switch. The Party recommends a backup either way, like the Party always does.
 .\build.ps1 -Install -Game 'D:\Games\SovietRepublic'
 ```
 
-This installs seven local development items into `media_soviet\workshop_wip`:
+This installs the seven Steam Workshop items into `media_soviet\workshop_wip`, under their
+Steam ids:
 
 | Item | What |
 |---|---|
-| 9000100 | the *Space Race* package: the `spacerace`, `experts` and `resources` plugins |
-| 9000101 | the building kit |
-| 9000111 to 9000115 | the five rockets |
+| [3814051864](https://steamcommunity.com/sharedfiles/filedetails/?id=3814051864) | *Space Race [1.1.1.9]*: the `spacerace`, `experts` and `resources` plugins |
+| [3814049784](https://steamcommunity.com/sharedfiles/filedetails/?id=3814049784) | *Space Race Kit*: the 16 buildings |
+| [3814050253](https://steamcommunity.com/sharedfiles/filedetails/?id=3814050253) | *R-7 Sputnik* |
+| [3814050457](https://steamcommunity.com/sharedfiles/filedetails/?id=3814050457) | *Vostok-K* |
+| [3814052488](https://steamcommunity.com/sharedfiles/filedetails/?id=3814052488) | *Soyuz* |
+| [3814050971](https://steamcommunity.com/sharedfiles/filedetails/?id=3814050971) | *Proton* |
+| [3814051385](https://steamcommunity.com/sharedfiles/filedetails/?id=3814051385) | *N1-L3* |
 
 Close the game and the loader before installing. The installer will not requisition files
 that are still in use. Then open Republic Mod Loader, enable those development items
-and the Space Race plugins, and launch.
+and the Space Race plugins, and launch. If you are also subscribed to the same items, the
+game loads only one copy of each: unsubscribe to test your local build.
 
 ## REBUILDING THE CONTENT
 
@@ -196,7 +206,7 @@ The research icons and the programme's window images are cut from the Blender re
 so run `build_space.py` first (it leaves them in `build/space` and `build/space_vehicles`):
 
 ```
-python tools/build_space.py            # textures, building kit, rockets, previews (needs Blender)
+python tools/build_space.py            # textures, building kit, rockets, previews, Workshop posters (needs Blender)
 python tools/build_space.py kit mik    # one stage for some buildings only
 python tools/space_research.py         # research branch, names and icons (needs the renders)
 python tools/build_space.py inis       # only the buildings' ini files, stand-in and new-goods variants
@@ -204,6 +214,7 @@ python tools/space_scenario.py         # the programme template + launches.ini, 
 python tools/space_settings.py         # spacerace.ini's balance part and data/defaults.ini, from all of the above
 python tools/space_workshop.py         # the seven Workshop items' configs and store pages, and kit_item
 python tools/readme_images.py          # the pictures in this README (renders in Blender, then docs/images)
+python tools/space_thumbs.py           # the seven Workshop posters (renders in Blender, then each previewimage.png)
 python tools/space_goods_icons.py      # icons of the new goods
 python tools/space_layout.py           # checks every truck bay against the building models
 python tools/port_resources.py         # re-ports the TesmioLoader resources plugin

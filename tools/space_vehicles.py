@@ -24,6 +24,7 @@ sys.path.insert(0, TOOLS)
 import nmf  # noqa: E402
 import mmkit  # noqa: E402
 import srkit as K  # noqa: E402
+import space_workshop as W  # noqa: E402  (Steam item ids and visibility)
 from space_palette import MATS  # noqa: E402
 
 argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
@@ -32,7 +33,7 @@ OUTROOT = argv[1] if len(argv) > 1 else 'mod/vehicles'
 PREVIEW = argv[2] if len(argv) > 2 else 'build/space_vehicles'
 KITDIR = argv[3] if len(argv) > 3 else 'mod/buildings/space_kit'
 
-# key, builder, item id, name, description, years, crew, hub height
+# key, builder, random seed (the rocket's first dev item id: keeps its shape), name, description, years, crew, hub height
 ROCKETS = [
     ('sr_sputnik', lambda b: K.rocket_r7(b, variant='sputnik'), 9000111, 'R-7 Sputnik (8K71PS)',
      'The Semyorka that opened the space age: Sputnik 1 on 4 October 1957, Laika a month later.', (1957, 1960), 1, 8.0),
@@ -99,9 +100,9 @@ def write_hidden_rotor(vdir, mat):
     rb.free()
 
 
-def workshopconfig(key, item, name, desc):
-    return '\r\n'.join(['$ITEM_ID %d' % item, '', '$OWNER_ID 76561198165729857', '', '$ITEM_TYPE WORKSHOP_ITEMTYPE_VEHICLE', '',
-                        '$VISIBILITY 2', '', '$OBJECT_VEHICLE %s' % key, '', '$ITEM_NAME "%s"' % name, '', '$ITEM_DESC "%s"' % desc, '', '$END', ''])
+def workshopconfig(key, name, desc):
+    return '\r\n'.join(['$ITEM_ID %d' % W.ITEMS[key][1], '', '$OWNER_ID 76561198165729857', '', '$ITEM_TYPE WORKSHOP_ITEMTYPE_VEHICLE', '',
+                        '$VISIBILITY %d' % W.VISIBILITY, '', '$OBJECT_VEHICLE %s' % key, '', '$ITEM_NAME "%s"' % name, '', '$ITEM_DESC "%s"' % desc, '', '$END', ''])
 
 
 def main():
@@ -130,7 +131,7 @@ def main():
         mmkit.write_text(os.path.join(vdir, 'material.mtl'), mtl(used))
         write_hidden_rotor(vdir, used[0])
         mmkit.write_text(os.path.join(vdir, 'script.ini'), script(key, name, desc, years, crew, hub, h))
-        mmkit.write_text(os.path.join(root, 'workshopconfig.ini'), workshopconfig(key, item, name, desc))
+        mmkit.write_text(os.path.join(root, 'workshopconfig.ini'), workshopconfig(key, name, desc))
         obs = b.preview_objects(bmats, key)
         # purchase-window previews: 3/4 view and a side view, transparent
         cy = h * 0.5
