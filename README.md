@@ -29,9 +29,9 @@ waits politely in any ordinary republic. An Early Start (1920) game reaches it b
 1950s, which is plenty of time if the cement works cooperate.
 
 > **Status: under construction, like most of the republic.** Every feature below has run
-> in the game, but nobody has played the full race yet. `mod/plugins/spacerace/spacerace.ini`
-> ships with `test_mode = 1` (space research at 5 % of its cost) so that the testers could
-> reach the Moon before retirement. Set it to `0` for a real Five-Year Plan.
+> in the game, but nobody has played the full race yet. Testers who would like to reach the
+> Moon before retirement may set `test_mode = 1` in `mod/plugins/spacerace/spacerace.ini`
+> (space research at 5 % of its cost, no year limits).
 
 ## WHAT THE STATE HAS APPROVED
 
@@ -178,17 +178,23 @@ switch. The Party recommends a backup either way, like the Party always does.
 .\build.ps1 -Install -Game 'D:\Games\SovietRepublic'
 ```
 
-This installs seven local development items into `media_soviet\workshop_wip`:
+This installs the seven Steam Workshop items into `media_soviet\workshop_wip`, under their
+Steam ids:
 
 | Item | What |
 |---|---|
-| 9000100 | the *Space Race* package: the `spacerace`, `experts` and `resources` plugins |
-| 9000101 | the building kit |
-| 9000111 to 9000115 | the five rockets |
+| [3814051864](https://steamcommunity.com/sharedfiles/filedetails/?id=3814051864) | *Space Race [1.1.1.9]*: the `spacerace`, `experts` and `resources` plugins |
+| [3814049784](https://steamcommunity.com/sharedfiles/filedetails/?id=3814049784) | *Space Race Kit*: the 16 buildings |
+| [3814050253](https://steamcommunity.com/sharedfiles/filedetails/?id=3814050253) | *R-7 Sputnik* |
+| [3814050457](https://steamcommunity.com/sharedfiles/filedetails/?id=3814050457) | *Vostok-K* |
+| [3814052488](https://steamcommunity.com/sharedfiles/filedetails/?id=3814052488) | *Soyuz* |
+| [3814050971](https://steamcommunity.com/sharedfiles/filedetails/?id=3814050971) | *Proton* |
+| [3814051385](https://steamcommunity.com/sharedfiles/filedetails/?id=3814051385) | *N1-L3* |
 
 Close the game and the loader before installing. The installer will not requisition files
 that are still in use. Then open Republic Mod Loader, enable those development items
-and the Space Race plugins, and launch.
+and the Space Race plugins, and launch. If you are also subscribed to the same items, the
+game loads only one copy of each: unsubscribe to test your local build.
 
 ## REBUILDING THE CONTENT
 

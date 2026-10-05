@@ -113,7 +113,7 @@ static char g_scenario[64] = "spacerace";
 static char g_mission[64]  = "race";
 static int  g_autostart = 1;
 static int  g_research = 1;
-static char g_kit[32] = "9000101";
+static char g_kit[32] = "3814049784";   // kit_item: the published Space Race Kit
 static int   g_test = 0;            // test_mode: cheap space research, no year limits, the branch open from the start
 static float g_testCost = 0.05f;    // test_cost: multiplier on our research costs in test mode
 

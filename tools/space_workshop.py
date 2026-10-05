@@ -1,34 +1,39 @@
 """The Space Race's seven Steam Workshop items: ids, names and store-page descriptions (Steam BBCode).
 
     python tools/space_workshop.py
+    python tools/space_workshop.py new     # preview + description files for the game's "create new item" form
 
 Rewrites workshopconfig.ini of the package (plugins), the building kit and the five rockets, and
 spacerace.ini's kit_item, from ITEMS below. Run it after tools/build_space.py (the kit and vehicle
 stages write their own short configs).
 
-Publishing (the game's uploader: main menu -> Workshop). A new item is created in the game first,
-which gives it its Steam id and a media_soviet/workshop_wip/<id> folder; put that id in ITEMS,
-run this, then `build.ps1 -Install` fills the folders and the game uploads them. $VISIBILITY is
-Steam's: 0 public, 1 friends only, 2 private, 3 unlisted.
+Publishing (the game's uploader: main menu -> Workshop -> Your items (WIP)). A new item is created
+in the game first with the green +, which asks for a preview PNG (under 1 MB), a name and a UTF-8
+TXT description (`new` writes them to build/workshop_new/space_race) and gives the item its Steam
+id and a media_soviet/workshop_wip/<id> folder; put that id in ITEMS, run this, then
+`build.ps1 -Install` fills the folders and the game uploads them. $VISIBILITY is the game's, not
+Steam's: 0 unpublished, 1 friends only, 2 PUBLIC (what 71 of 81 published items carry).
 """
 import os
 import re
+import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OWNER = 76561198165729857
-VISIBILITY = 2
+VISIBILITY = 0                  # unpublished; switch to public on Steam once the items are checked
 REPO = 'https://github.com/aislanfoina/wrsr_spacerace'
-RML = 'https://steamcommunity.com/sharedfiles/filedetails/?id=3787969749'
+ITEM_URL = 'https://steamcommunity.com/sharedfiles/filedetails/?id=%d'
+RML = ITEM_URL % 3787969749
 
-# key: (folder, item id, item type, name). Local development ids (90001xx) until the items exist on Steam.
+# key: (folder, Steam item id, item type, name). Created in the game on 2026-10-05 (dev ids were 90001xx).
 ITEMS = {
-    'package': ('mod/packages/space_race', 9000100, 'WORKSHOP_ITEMTYPE_SCRIPT', 'Space Race [1.1.1.9]'),
-    'kit': ('mod/buildings/space_kit', 9000101, 'WORKSHOP_ITEMTYPE_BUILDING', 'Space Race Kit'),
-    'sr_sputnik': ('mod/vehicles/sr_sputnik', 9000111, 'WORKSHOP_ITEMTYPE_VEHICLE', 'Space Race: R-7 Sputnik'),
-    'sr_vostok': ('mod/vehicles/sr_vostok', 9000112, 'WORKSHOP_ITEMTYPE_VEHICLE', 'Space Race: Vostok-K'),
-    'sr_soyuz': ('mod/vehicles/sr_soyuz', 9000113, 'WORKSHOP_ITEMTYPE_VEHICLE', 'Space Race: Soyuz'),
-    'sr_proton': ('mod/vehicles/sr_proton', 9000114, 'WORKSHOP_ITEMTYPE_VEHICLE', 'Space Race: Proton'),
-    'sr_n1': ('mod/vehicles/sr_n1', 9000115, 'WORKSHOP_ITEMTYPE_VEHICLE', 'Space Race: N1-L3'),
+    'package': ('mod/packages/space_race', 3814051864, 'WORKSHOP_ITEMTYPE_SCRIPT', 'Space Race [1.1.1.9]'),
+    'kit': ('mod/buildings/space_kit', 3814049784, 'WORKSHOP_ITEMTYPE_BUILDING', 'Space Race Kit'),
+    'sr_sputnik': ('mod/vehicles/sr_sputnik', 3814050253, 'WORKSHOP_ITEMTYPE_VEHICLE', 'Space Race: R-7 Sputnik'),
+    'sr_vostok': ('mod/vehicles/sr_vostok', 3814050457, 'WORKSHOP_ITEMTYPE_VEHICLE', 'Space Race: Vostok-K'),
+    'sr_soyuz': ('mod/vehicles/sr_soyuz', 3814052488, 'WORKSHOP_ITEMTYPE_VEHICLE', 'Space Race: Soyuz'),
+    'sr_proton': ('mod/vehicles/sr_proton', 3814050971, 'WORKSHOP_ITEMTYPE_VEHICLE', 'Space Race: Proton'),
+    'sr_n1': ('mod/vehicles/sr_n1', 3814051385, 'WORKSHOP_ITEMTYPE_VEHICLE', 'Space Race: N1-L3'),
 }
 KIT_OBJECTS = ('pad_r7', 'pad_n1', 'mik', 'rocket_plant', 'engine_plant', 'test_stand', 'lox_plant', 'propellant',
                'instruments', 'spacecraft', 'tracking', 'training', 'bureau', 'recovery', 'monument', 'gagarin')
@@ -93,9 +98,9 @@ It does, however, come as a kit. Sixteen buildings of the Soviet space programme
 [*][b]Flight and crew[/b]: the Pluton deep space tracking station, Star City, OKB-1 and a landing and recovery field.
 [*][b]Glory[/b]: the Monument to the Conquerors of Space and the Gagarin column.
 [/list]
-Part of the [b]Space Race[/b]: subscribe to the Space Race item too, which unlocks these buildings through its research branch and makes the rockets fly. See that item for how to play.
+Part of the [b]Space Race[/b]: subscribe to [url=%s]the Space Race item[/url] too, which unlocks these buildings through its research branch and makes the rockets fly. See that item for how to play.
 
-''' + FOOTER
+''' % (ITEM_URL % ITEMS['package'][1]) + FOOTER
 
 ROCKETS = {
     'sr_sputnik': 'The Semyorka that opened the space age: Sputnik 1 on 4 October 1957, Laika a month later. Flies the first two milestones from the R-7 launch complex.',
@@ -108,8 +113,9 @@ ROCKETS = {
 
 def rocket_desc(key):
     return ('[h1]%s[/h1]\n%s\n\nBuilt at the MIK from rocket stages, engines and avionics, rolled out onto its launch pad and '
-            'launched by the Space Race programme. Part of the [b]Space Race[/b]: subscribe to the Space Race item and the '
-            'Space Race Kit too.\n\n' % (ITEMS[key][3].replace('Space Race: ', ''), ROCKETS[key])) + FOOTER
+            'launched by the Space Race programme. Part of the [b]Space Race[/b]: subscribe to [url=%s]the Space Race item[/url] '
+            'and [url=%s]the Space Race Kit[/url] too.\n\n'
+            % (ITEMS[key][3].replace('Space Race: ', ''), ROCKETS[key], ITEM_URL % ITEMS['package'][1], ITEM_URL % ITEMS['kit'][1])) + FOOTER
 
 
 def config(key, desc, objects):
@@ -124,7 +130,30 @@ def config(key, desc, objects):
     print('%-11s %d  %-28s %5d chars  %s' % (key, item, name, len(desc), os.path.relpath(path, ROOT)))
 
 
+def new_items(out):
+    """What the game's "create new item" form asks for, one PNG + one UTF-8 TXT per item, numbered in upload order."""
+    import shutil
+    os.makedirs(out, exist_ok=True)
+    descs = {'package': PACKAGE, 'kit': KIT}
+    descs.update((k, rocket_desc(k)) for k in ROCKETS)
+    order = ['kit'] + list(ROCKETS) + ['package']
+    lines = ['Create each item in the game (Workshop -> Your items (WIP) -> green +), visibility Unpublished:', '']
+    for n, key in enumerate(order, 1):
+        folder, _item, typ, name = ITEMS[key]
+        base = '%d_%s' % (n, key)
+        png = os.path.join(ROOT, folder, 'previewimage.png')
+        assert os.path.getsize(png) < 1 << 20, '%s: the game refuses previews of 1 MB or more' % key
+        shutil.copy2(png, os.path.join(out, base + '.png'))
+        open(os.path.join(out, base + '.txt'), 'w', encoding='utf-8', newline='').write(descs[key].replace('\n', '\r\n'))
+        lines.append('%d. %-26s type %-8s image %s.png  description %s.txt'
+                     % (n, name, typ.replace('WORKSHOP_ITEMTYPE_', '').title(), base, base))
+    open(os.path.join(out, 'ITEMS.txt'), 'w', encoding='utf-8', newline='').write('\r\n'.join(lines + ['']))
+    print('\n'.join(lines) + '\n-> ' + out)
+
+
 def main():
+    if sys.argv[1:2] == ['new']:
+        return new_items(os.path.join(ROOT, 'build', 'workshop_new', 'space_race'))
     config('package', PACKAGE, [])
     config('kit', KIT, ['$OBJECT_BUILDING sr_%s' % k for k in KIT_OBJECTS])
     for key in ROCKETS:
