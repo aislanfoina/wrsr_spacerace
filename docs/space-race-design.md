@@ -493,7 +493,8 @@ health at least 0.8) and OKB-1 (730 days, chief designers up to 3.6, aged
 30-65).
 
 **The programme** (`tools/space_scenario.py`, one mission, 1,555 VM lines)
-sleeps until *Rocket Research Institute* is researched, then runs eight
+sleeps until *Rocket Research Institute* is researched (since 2026-10-09: and the
+Design Bureau built, see "Opening the programme" below), then runs eight
 milestones in order. Each waits for its research, then shows progress bars and
 launches when everything is in place: a rocket of the right type assigned to a
 heliport-type building and parked within 90 m of it; propellant and payload in
@@ -809,6 +810,55 @@ unchanged in both modes; edited settings reach every token, file and rules line.
   left in it). No converter tool needed for the goods.
 - Not tested: a save loaded with the plugins switched off in RML altogether (the scenario, the
   space research entries and the kit buildings would remain in it).
+
+### Opening the programme: OKB-1 and the late start (2026-10-09, built, tested offline)
+
+Two player reports against the first Workshop release (missions `race_d874e562` /
+`race_710a135c`):
+
+- **Window spam in an old save.** The programme woke on `IsResearched("sr_rocketry")`
+  alone, which is also true in any game with research switched off. It then opened the
+  welcome window and went straight through every milestone whose research was done.
+- **Loyalty crash in a late save.** `CheckUSA()` ran inside the waiting loop, before the
+  programme had even started, so every American date already past cost
+  `america_first_loyalty` (-5 %) at once: -40 % in a 1975 save.
+
+The new template:
+
+- **Dormant until the republic joins:** `sr_rocketry` researched (or research off) **and** a
+  finished Design Bureau (OKB-1), found by its fingerprint: `BUILDINGTYPE_UNIVERSITY`,
+  80 workers, 120 professors (tokens `bureau_workers` / `bureau_educated` from
+  `[building:sr_bureau]`). No vanilla university matches (75/75, 50/50, 100/100, 70/70).
+  Nothing runs before that, the American timeline included. One notification, once the
+  research is done, says OKB-1 opens the race.
+- **The American timeline starts with the programme.** At opening (`nStart`, year*365+day)
+  the script computes `usDue[i]` = the American date + `nShift`. With `[america] late_start =
+  shift` (default) and an opening after `start` (default 1954-01-01, token `start_day`),
+  `nShift` = the delay, so every American date moves and the race stays whole. With
+  `history` the real dates stand. Either way, a milestone whose `usDue` falls on or before
+  the opening is marked done for the Americans silently: no notification, no loyalty lost.
+  Reaching it later pays the catch-up reward.
+- **The welcome window and race objective** have four variants:
+  - on time;
+  - shifted: "they mean to land on the Moon in about 16 years", token `moon_after`, worded
+    the same in Python `years_text` and C `YearsText`;
+  - behind (some American milestones already history);
+  - the Moon already lost.
+
+  No runtime-built text: the game's own scripts never pass a `char[]` to a window, so it is
+  untested ground.
+- **Legacy:** both released renders are frozen in `legacy/` (byte-identical to the
+  plugin's output). A save keeps the programme it began with, so republics already
+  loaded with the first release keep its behaviour. The fix reaches new games and saves
+  first loaded with this version.
+
+Offline: `vmcheck` 0 problems on both renders. The harness renders the template
+identically to Python for both goods modes (`race_6c98eb85`, `race_06f5fb56`), and custom
+`start` / `late_start` / OKB-1 staff reach the script. Not yet seen in game:
+- the hint;
+- opening on OKB-1;
+- each window variant;
+- a shifted American notification.
 
 ### Pending: showing the experts in game (done in the launch-sequence programme)
 

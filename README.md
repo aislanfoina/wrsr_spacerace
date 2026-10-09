@@ -24,9 +24,11 @@ The objective is simple: **put a Soviet cosmonaut on the Moon before 20 July 196
 Americans have a head start, a larger budget and Apollo 11. You have kerosene, liquid
 oxygen and a Five-Year Plan.
 
-The programme stays asleep until you research the *Rocket Research Institute*, so it
-waits politely in any ordinary republic. An Early Start (1920) game reaches it by the
-1950s, which is plenty of time if the cement works cooperate.
+The programme stays asleep until the republic researches the *Rocket Research Institute*
+**and** builds the *Design Bureau (OKB-1)*. Until then it waits politely in any ordinary
+republic: no windows, no objectives, and no Americans keeping score. Building OKB-1 is how
+the republic signs up. An Early Start (1920) game gets there by the 1950s, which is plenty
+of time if the cement works cooperate.
 
 **On the Steam Workshop:** [Space Race: the complete programme](https://steamcommunity.com/sharedfiles/filedetails/?id=3814187744).
 Press *Subscribe to all* and the Ministry delivers the plugins, the kit, all five rockets and
@@ -90,6 +92,16 @@ Republic Mod Loader.
 Historically, the Soviet Union got to six of these eight first. The Central Committee
 has reviewed that result and expects eight.
 
+### Late to the race?
+
+The dates above assume the programme opens by 1954. A republic that builds OKB-1 later
+(say, a 1960 start, or a save that subscribes in 1980) does not lose eight milestones on
+day one. By default (`late_start = shift` in `spacerace.ini`) the Americans start late
+too: every date moves by the delay, and the whole race is still on, just later. Prefer
+the history books? With `late_start = history` the real dates stand. Whatever the
+Americans did before the programme opened is theirs, at no cost in loyalty, and getting
+there afterwards still pays the catch-up reward.
+
 ## LAUNCH PROCEDURE
 
 *As approved by the State Commission, in triplicate:*
@@ -144,7 +156,7 @@ filled in and explained. Change one and restart the game:
 |---|---|
 | `[general]` | the switches: test mode, the new goods, the programme starting itself |
 | `[research]` | the year each space entry opens and its cost, one by one or all at once (`year_shift`, `cost_scale`) |
-| `[america]` | the day the Americans reach each milestone, shifted as a whole or set to `never` |
+| `[america]` | the day the Americans reach each milestone, shifted as a whole or set to `never`, and what a late programme does to them (`start`, `late_start`) |
 | `[milestones]` | failure chance, cosmonauts and tracking stations for each milestone |
 | `[rockets]` | what each launch takes from the storages near its pad |
 | `[rocket_parts]` | what the MIK builds each rocket from |
@@ -174,6 +186,12 @@ be switched on for an existing republic too: load it and they join the economy. 
 them off again is allowed: whatever is in stock is requisitioned as its stand-in (chemicals,
 mechanical components, electronics) and the next save is a plain one. Save once after each
 switch. The Party recommends a backup either way, like the Party always does.
+
+**Saves from the first release (5 October 2026):** that programme woke up on the research
+alone and counted the Americans from day one. A save keeps the programme it was first
+loaded with, so a republic loaded with that release keeps it. If it buried you in windows or
+cost you loyalty, load a save from before you subscribed: this version moves in quietly and
+waits for OKB-1.
 
 ## BUILD AND INSTALL
 
