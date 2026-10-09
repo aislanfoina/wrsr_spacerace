@@ -19,8 +19,11 @@ The plugin renders the template at start-up into scenarios/spacerace/race_<hash>
 its own for every set of settings: a save keeps the running programme's state, so a game keeps
 the rules it began with while new games take the current ones.
 
-How it plays: the script sleeps until the Rocket Research Institute is researched, then walks
-the milestones in order. Each milestone waits for its research, a rocket of the right type
+How it plays: the script sleeps, invisible, until the republic joins: the Rocket Research
+Institute researched and the Design Bureau (OKB-1) built (a hint appears once the research is
+done). The American timeline starts from that day: a late programme shifts it or leaves the past
+to the Americans without a penalty ([america] start / late_start). Then it walks the milestones
+in order. Each milestone waits for its research, a rocket of the right type
 parked on a launch pad (a heliport-type building it is assigned to), propellant and payload in
 storages near the pad, cosmonauts (experts, education >= 3) and tracking stations. Then it
 launches: the goods are consumed, a failure roll decides (it falls with every success of that
@@ -147,6 +150,14 @@ MONTHS = ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'Augus
           'November', 'December')
 MONTH_DAYS = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
 
+# spacerace.ini [america] start / late_start. The American dates assume the programme opens by
+# AMERICA_START. One that opens later (a republic that reaches space in 1975, or a save that gets
+# the mod late) either shifts every American date by the delay - a whole race, just later - or
+# keeps the real dates: what the Americans did before the programme opened is then history, with
+# no loyalty lost for it, and reaching it pays the catch-up reward.
+AMERICA_START = '1954-01-01'
+LATE_START = 'shift'                  # or 'history'
+
 
 def day_of_year(date):
     """Year and day (1-365) of a YYYY-MM-DD date in the game's 365-day calendar (Date_GetCurrentDate_D365Y);
@@ -158,6 +169,18 @@ def day_of_year(date):
 def date_text(date):
     y, m, d = (int(x) for x in date.split('-'))
     return '%d %s %d' % (d, MONTHS[m - 1], y)
+
+
+def day_number(date):
+    """A date as the script counts days: year * 365 + day of the year."""
+    y, d = day_of_year(date)
+    return y * 365 + d
+
+
+def years_text(days):
+    """'in about 16 years' for a span of days; the plugin words it the same way."""
+    years = (days + 182) // 365
+    return 'in about %d years' % years if years > 1 else 'in about a year' if years == 1 else 'within a year'
 
 
 def staff(obj):
@@ -236,7 +259,8 @@ def gen_script(t, new_goods=False):
     for v in ('i', 'j', 'k', 'n', 'r', 'day', 'year', 'winexist', 'bContinue', 'nVeh', 'nPad', 'nExperts', 'nTrack',
               'nResearch', 'fi', 'fj', 'fk', 'fn', 'si', 'sn', 'ti', 'tn', 'bi', 'bn', 'ci', 'cn',
               'li', 'ln', 'lk', 'rr', 'ki', 'kn', 'nCosmo', 'nCosmoShown', 'bObjReady', 'bCosmoObj',
-              'nBlockedPad', 'nBlockUntil', 'nNow', 'nPadOK', 'nTest', 'nNeedCrew', 'nNeedTrack'):
+              'nBlockedPad', 'nBlockUntil', 'nNow', 'nPadOK', 'nTest', 'nNeedCrew', 'nNeedTrack',
+              'nStart', 'nShift', 'nAhead', 'bHinted', 'nBureau'):
         a('defineVariable(int, %s);' % v)
     for v in ('f', 'f2', 'fFail', 'fFuel', 'fLox', 'fHyper', 'fCraft', 'fFood', 'fDist', 'fLoyal', 'fr', 'fCosmo', 'fUp',
               'fNeed'):
@@ -251,6 +275,7 @@ def gen_script(t, new_goods=False):
     a('defineVariable(Resources, res);')
     a('defineArray(int[%d], srDone);' % len(MILESTONES))
     a('defineArray(int[%d], usDone);' % len(MILESTONES))
+    a('defineArray(int[%d], usDue);' % len(MILESTONES))
     a('defineArray(int[6], rocketOK);')
     a('')
     # --- experts: citizens with education >= 3 (the experts plugin makes them)
@@ -297,6 +322,24 @@ def gen_script(t, new_goods=False):
     a('\t\tbui.GetDataByIndex(bi);')
     a('\t\tif (bui.nValidRead & bui.nType ? BUILDINGTYPE_BROADCAST & bui.nProffesorsNeeded ? %s & bui.nWorkersNeeded ? %s & bui.fPercFinished > 0.9999)'
       % (t.i('track_educated', track_e), t.i('track_workers', track_w)))
+    a('\t\t{')
+    a('\t\t\tfk = fk + 1;')
+    a('\t\t}')
+    a('\t}')
+    a('\treturn(fk);')
+    a('}')
+    a('')
+    # --- the Design Bureau (OKB-1): building it is how a republic joins the race
+    bureau_w, bureau_e = staff('sr_bureau')
+    a('defineFunction(CountBureaus, int)')
+    a('{')
+    a('\tfk = 0;')
+    a('\tBuilding_GetNumberOfBuildings(bn);')
+    a('\tfor (bi=0, bi<bn, bi=bi+1)')
+    a('\t{')
+    a('\t\tbui.GetDataByIndex(bi);')
+    a('\t\tif (bui.nValidRead & bui.nType ? BUILDINGTYPE_UNIVERSITY & bui.nWorkersNeeded ? %s & bui.nProffesorsNeeded ? %s & bui.fPercFinished > 0.9999)'
+      % (t.i('bureau_workers', bureau_w), t.i('bureau_educated', bureau_e)))
     a('\t\t{')
     a('\t\t\tfk = fk + 1;')
     a('\t\t}')
@@ -467,15 +510,14 @@ def gen_script(t, new_goods=False):
     a('\treturnVoid();')
     a('}')
     a('')
-    # --- the American timeline, announced as the dates pass
+    # --- the American timeline, announced as the dates pass (usDue: set when the programme opens)
     a('defineFunction(CheckUSA, void)')
     a('{')
     a('\tCheckCosmonauts();')
     a('\tDate_GetCurrentDate_D365Y(day, year);')
+    a('\tnNow = year * 365 + day;')
     for idx, m in enumerate(MILESTONES):
-        y, d = day_of_year(m['us_date'])
-        ty = t.i('us_year_%d' % idx, y)
-        a('\tif (!usDone[%d] & (year > %s | (year ? %s & day > %s)))' % (idx, ty, ty, t.i('us_day0_%d' % idx, d - 1)))
+        a('\tif (!usDone[%d] & nNow + 1 > usDue[%d])' % (idx, idx))
         a('\t{')
         a('\t\tusDone[%d] = 1;' % idx)
         a('\t\tif (srDone[%d])' % idx)
@@ -494,25 +536,88 @@ def gen_script(t, new_goods=False):
     a('')
     # --- main
     moon_when = t.s('moon_when', 'by ' + date_text(moon['us_date']))
+    moon_after = t.s('moon_after', years_text(day_number(moon['us_date']) - day_number(AMERICA_START)))
+    last = len(MILESTONES) - 1
     a('defineFunction(main, void)')
     a('{')
     a('\tInitConstants();')
     a('\tbObjReady = 0; bCosmoObj = 0; nCosmoShown = 0; nBlockUntil = 0;')
     a('\tnBlockedPad = 0 - 1;')
-    a('\tfor (i=0, i<%d, i=i+1) { srDone[i] = 0; usDone[i] = 0; }' % len(MILESTONES))
+    a('\tfor (i=0, i<%d, i=i+1) { srDone[i] = 0; usDone[i] = 0; usDue[i] = 0; }' % len(MILESTONES))
     a('\tfor (i=0, i<6, i=i+1) { rocketOK[i] = 0; }')
-    a('\t// wait quietly for the first space research - an ordinary republic never notices this script')
-    a('\tnResearch = 0;')
-    a('\twhile (!nResearch)')
+    a('\t// dormant until the republic joins: the first space research done AND the Design Bureau (OKB-1)')
+    a('\t// built. Until then nothing shows and nothing counts - not even the American timeline.')
+    a('\tnStart = 0;')
+    a('\tbHinted = 0;')
+    a('\twhile (!nStart)')
     a('\t{')
     a('\t\tScript_Sleep(30.0);')
     a('\t\tnResearch = IsResearched("sr_rocketry");')
-    a('\t\tCheckUSA();')
+    a('\t\tif (nResearch)')
+    a('\t\t{')
+    a('\t\t\tnBureau = CountBureaus();')
+    a('\t\t\tif (nBureau > 0)')
+    a('\t\t\t{')
+    a('\t\t\t\tDate_GetCurrentDate_D365Y(day, year);')
+    a('\t\t\t\tnStart = year * 365 + day;')
+    a('\t\t\t}')
+    a('\t\t\telse()')
+    a('\t\t\t{')
+    a('\t\t\t\tif (!bHinted)')
+    a('\t\t\t\t{')
+    a('\t\t\t\t\tNotification_CreateNewStringPic("The Space Programme", "The Rocket Research Institute is ready. The Space Race begins when the republic builds the Design Bureau (OKB-1); until then the programme stays on paper.", "research/sr_rocketry.png", padPos);')
+    a('\t\t\t\t\tbHinted = 1;')
+    a('\t\t\t\t}')
+    a('\t\t\t}')
+    a('\t\t}')
     a('\t}')
-    a('\tScenario_WindowWithImageLeft("The Space Programme", "The Rocket Research Institute has opened. Korolev\'s designers promise a satellite before the Americans, then a man in space, then the Moon. Research the space branch, build the plants, the launch complexes and the cosmonaut corps. The Americans will not wait: they mean to land on the Moon %s.", "programme.png", 3);' % moon_when)
-    a('\twinexist = 1;')
-    a('\twhile (winexist) { Scenario_WindowExists(winexist); }')
-    a('\tScenario_ObjectiveCreate("sr_race", "The Space Race", "Reach every milestone before the United States. The last one: an N1 carrying cosmonauts to the Moon before the Americans get there, %s.");' % moon_when)
+    a('\t// the American timeline from the day the programme opened: a late start shifts it (late_start =')
+    a('\t// shift), and whatever the Americans did before that day is history - no loyalty lost for it')
+    a('\tnShift = 0;')
+    a('\tk = %s;' % t.i('late_shift', 1 if LATE_START == 'shift' else 0))
+    a('\tif (k)')
+    a('\t{')
+    a('\t\tif (nStart > %s) { nShift = nStart - %s; }' % ((t.i('start_day', day_number(AMERICA_START)),) * 2))
+    a('\t}')
+    a('\tnAhead = 0;')
+    for idx, m in enumerate(MILESTONES):
+        y, d = day_of_year(m['us_date'])
+        a('\tusDue[%d] = %s * 365 + %s + 1 + nShift;' % (idx, t.i('us_year_%d' % idx, y), t.i('us_day0_%d' % idx, d - 1)))
+        a('\tif (usDue[%d] < nStart + 1) { usDone[%d] = 1; nAhead = nAhead + 1; }' % (idx, idx))
+    opening = ("The Design Bureau (OKB-1) is at work. Korolev's designers promise a satellite before the Americans, then a man "
+               "in space, then the Moon. Research the space branch, build the plants, the launch complexes and the cosmonaut corps.")
+    goal = 'Reach every milestone before the United States. The last one: an N1 carrying cosmonauts to the Moon before the Americans get there'
+    a('\tif (usDone[%d])' % last)
+    a('\t{')
+    a('\t\tScenario_WindowWithImageLeft("The Space Programme", "%s We start late: the Americans have already been to the Moon. The race is theirs, but the programme is ours - every milestone still pays, and the world is still watching.", "programme.png", 3);' % opening)
+    a('\t\twinexist = 1;')
+    a('\t\twhile (winexist) { Scenario_WindowExists(winexist); }')
+    a('\t\tScenario_ObjectiveCreate("sr_race", "The Space Race", "Fly every milestone of the programme. The last one: an N1 carrying cosmonauts to the Moon.");')
+    a('\t}')
+    a('\telse()')
+    a('\t{')
+    a('\t\tif (nShift > 0)')
+    a('\t\t{')
+    a('\t\t\tScenario_WindowWithImageLeft("The Space Programme", "%s The Americans are only now getting started too, and they will not wait: they mean to land on the Moon %s.", "programme.png", 3);' % (opening, moon_after))
+    a('\t\t\twinexist = 1;')
+    a('\t\t\twhile (winexist) { Scenario_WindowExists(winexist); }')
+    a('\t\t\tScenario_ObjectiveCreate("sr_race", "The Space Race", "%s - they mean to land %s.");' % (goal, moon_after))
+    a('\t\t}')
+    a('\t\telse()')
+    a('\t\t{')
+    a('\t\t\tif (nAhead > 0)')
+    a('\t\t\t{')
+    a('\t\t\t\tScenario_WindowWithImageLeft("The Space Programme", "%s We start late: the Americans have already flown the first milestones, and those are theirs. The rest of the race is open - they mean to land on the Moon %s.", "programme.png", 3);' % (opening, moon_when))
+    a('\t\t\t}')
+    a('\t\t\telse()')
+    a('\t\t\t{')
+    a('\t\t\t\tScenario_WindowWithImageLeft("The Space Programme", "%s The Americans will not wait: they mean to land on the Moon %s.", "programme.png", 3);' % (opening, moon_when))
+    a('\t\t\t}')
+    a('\t\t\twinexist = 1;')
+    a('\t\t\twhile (winexist) { Scenario_WindowExists(winexist); }')
+    a('\t\t\tScenario_ObjectiveCreate("sr_race", "The Space Race", "%s, %s.");' % (goal, moon_when))
+    a('\t\t}')
+    a('\t}')
     a('\tbObjReady = 1;')
     for idx, m in enumerate(MILESTONES):
         p = m['power'] - 9001
@@ -669,7 +774,6 @@ def gen_script(t, new_goods=False):
             a('\tObjective_Remove("%s");' % o)
         a('\tif (nNeedCrew > 0) { Objective_Remove("sr_crew"); }')
         a('\tif (nNeedTrack > 0) { Objective_Remove("sr_track"); }')
-    last = len(MILESTONES) - 1
     a('')
     a('\tif (usDone[%d])' % last)
     a('\t{')

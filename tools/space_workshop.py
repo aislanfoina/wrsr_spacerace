@@ -69,7 +69,9 @@ The objective is simple: [b]put a Soviet cosmonaut on the Moon before 20 July 19
 [*][b]The programme[/b]: eight milestones against the real American timeline. Coming first pays in dollars and loyalty.
 [*][b]Six new goods, if the republic wants them[/b]: rocket stages, rocket engines, avionics, liquid oxygen, hypergolic propellant and spacecraft.
 [/list]
-The programme sleeps until you research the Rocket Research Institute, so it waits politely in any ordinary republic.
+The programme sleeps until the republic researches the Rocket Research Institute [b]and[/b] builds the Design Bureau (OKB-1): no windows, no objectives and no Americans keeping score until then. Building OKB-1 is how the republic signs up.
+
+[b]Late to the race?[/b] The dates assume the programme opens by 1954. A republic that opens it later (a 1960 start, a save that subscribes in 1980) does not lose eight milestones on day one: the Americans start late too, and the whole race is still on. Prefer the history books? Set [b]late_start = history[/b] and the real dates stand, at no cost in loyalty for what the Americans did before you started.
 
 [img]%(img)sbuildings.jpg[/img]
 [i]The sixteen buildings of the Space Race Kit.[/i]
@@ -81,7 +83,7 @@ The programme sleeps until you research the Rocket Research Institute, so it wai
 [olist]
 [*]Subscribe to this item, the [b]Space Race Kit[/b] and the five rockets (the Required Items on this page), and to [url=%(rml)s]Republic Mod Loader[/url].
 [*]Run Republic Mod Loader, enable the Space Race items and their plugins (spacerace, experts, resources), and launch the game.
-[*]Load your republic or start a new one. Research the Rocket Research Institute and the programme takes it from there.
+[*]Load your republic or start a new one. Research the Rocket Research Institute, build the Design Bureau (OKB-1), and the programme takes it from there.
 [/olist]
 Requires Workers & Resources: Soviet Republic [b]1.1.1.9[/b]: the plugins patch this exact build.
 
@@ -90,6 +92,8 @@ Requires Workers & Resources: Soviet Republic [b]1.1.1.9[/b]: the plugins patch 
 
 [h2]SAVES[/h2]
 Out of the box ([b]new_goods = 0[/b]) the mod adds no goods, and your existing republic can join the race as it is: liquid oxygen travels as chemicals, rocket parts as mechanical components and spacecraft as electronics. The six new goods ([b]new_goods = 1[/b]) can be switched on for an existing republic too: load it and they join the economy. Switched off again, whatever is in stock becomes its stand-in and the next save is a plain one. Save once after each switch, and keep a backup: the Party always does.
+
+[b]Saves from the first release (5 October 2026):[/b] that programme woke up on the research alone and counted the Americans from day one. A save keeps the programme it was first loaded with, so if it buried you in windows or cost you loyalty, load a save from before you subscribed: this version moves in quietly and waits for OKB-1.
 
 [h2]THE PLAN IS NEGOTIABLE[/h2]
 Every number is a recommendation from the Central Committee, not a law of physics. [b]plugins\\spacerace.ini[/b] in this item's folder holds them all, explained: research years and costs, the day the Americans reach each milestone (or never), failure chances, cosmonauts and tracking stations, launch loads, rocket parts, rewards, and the cost, staff and recipes of every building. A running republic keeps the programme rules it began with, so tampering with the timeline cannot break a race already under way. (Steam replaces the file when the mod updates: keep a copy of your changes.)
