@@ -1194,10 +1194,26 @@ static float LoadOf(const GoodT* g, int n, const char* good)
     return 0.0f;
 }
 
+// "in about 16 years" for a span of days, as tools/space_scenario.py years_text words it
+static void YearsText(char* out, size_t n, int days)
+{
+    int years = (days + 182) / 365;
+    if (years > 1) sprintf_s(out, n, "in about %d years", years);
+    else strcpy_s(out, n, years == 1 ? "in about a year" : "within a year");
+}
+
 static int MakeTokens(char goods[5][32], char keys[][24], char rockets[][32], int nm)
 {
     char name[32];
     int shift = GetI("america", "year_shift", 0);
+    // the day the American timeline assumes the programme opens by ([america] start), and whether
+    // a later programme shifts the timeline (late_start = shift) or leaves the past to them (history)
+    int sy = 0, sdoy = 1, sd = 1, sm = 1;
+    const char* start = Get("america", "start");
+    int startDay = ParseDate(start ? start : "1954-01-01", &sy, &sdoy, &sd, &sm) ? sy * 365 + sdoy : 0;
+    const char* late = Get("america", "late_start");
+    TokI("start_day", startDay);
+    TokI("late_shift", startDay > 0 && !(late && _stricmp(late, "history") == 0));
     for (int i = 0; i < nm; ++i)
     {
         int y = 0, doy = 1, d = 1, m = 1;
@@ -1211,6 +1227,9 @@ static int MakeTokens(char goods[5][32], char keys[][24], char rockets[][32], in
             if (y < 9999) sprintf_s(when, sizeof when, "by %d %s %d", d, kMonths[m - 1], y);
             else strcpy_s(when, sizeof when, "one day");
             TokS("moon_when", when);
+            if (y < 9999 && startDay > 0) YearsText(when, sizeof when, y * 365 + doy - startDay);
+            else strcpy_s(when, sizeof when, "one day");
+            TokS("moon_after", when);
         }
         const char* ms = Get("milestones", keys[i]);
         float fail = 30.0f, crew = 0.0f, track = 0.0f;
@@ -1265,6 +1284,9 @@ static int MakeTokens(char goods[5][32], char keys[][24], char rockets[][32], in
     TokI("stand_educated", GetI("building:sr_test_stand", "educated", 40));
     TokI("track_workers", GetI("building:sr_tracking", "workers", 40));
     TokI("track_educated", GetI("building:sr_tracking", "educated", 30));
+    // ...and the Design Bureau, whose completion opens the programme
+    TokI("bureau_workers", GetI("building:sr_bureau", "workers", 80));
+    TokI("bureau_educated", GetI("building:sr_bureau", "educated", 120));
     return g_ntok;
 }
 

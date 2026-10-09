@@ -102,8 +102,14 @@ def balance():
 
     a('')
     a('[america]')
-    a('; the day the United States reaches each milestone (YYYY-MM-DD), or never')
+    a('; the day the United States reaches each milestone (YYYY-MM-DD), or never. The programme opens')
+    a('; when the republic has researched the Rocket Research Institute and built the Design Bureau')
+    a('; (OKB-1); until then nothing happens, and the Americans are not counted. A programme that opens')
+    a('; after start: late_start = shift moves every American date by the delay (a whole race, later);')
+    a('; history keeps the real dates, and what the Americans did before it opened costs nothing.')
     a(line('year_shift', 0, 'added to every year: 5 gives the Americans five slower years'))
+    a(line('start', SC.AMERICA_START, 'the programme is expected to open by this day'))
+    a(line('late_start', SC.LATE_START, 'shift or history'))
     for m in SC.MILESTONES:
         a(line(m['key'], m['us_date'], '%s (%s)' % (m['us_what'], m['title'])))
 
