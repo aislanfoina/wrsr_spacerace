@@ -49,7 +49,8 @@ Republic Mod Loader.
     the MIK assembly building.
   - Rockets and parts: the Progress rocket plant, the OKB-456 engine works, an engine test
     stand, oxygen and propellant plants, instrument works and a spacecraft hall.
-  - Flight and crew: the Pluton tracking station, Star City, OKB-1 and a recovery field.
+  - Flight and crew: the Pluton tracking station, the Cosmonaut Training Centre (Star City),
+    OKB-1 and a recovery field.
   - Two monuments, so the republic can admire itself.
 
   ![The sixteen buildings of the Space Race Kit](docs/images/buildings.jpg)
@@ -65,12 +66,12 @@ Republic Mod Loader.
   them on (see *Saves*), and the programme then runs on the goods your republic already
   trades in: chemicals for the oxygen, mechanical components for the rocket parts,
   electronics for the spacecraft.
-- **Cosmonauts: a fourth education tier.** Graduates aged 23 to 35 in good health who work at
-  Star City join a class of 40. After about a year they come out as *experts*
-  (education 3+). OKB-1 turns engineers aged 30 to 65 into chief designers the same way,
-  at two years a tier, because designing takes longer than flying. Crewed flights will
-  not leave without cosmonauts. The tier is a separate plugin that other mods can reuse,
-  in case other ministries also want experts.
+- **Cosmonauts: a fourth education tier.** Graduates who work at the Cosmonaut Training
+  Centre (Star City) come out as *experts* (education 3+) after about a year. OKB-1 turns
+  engineers into chief designers the same way, at two years a tier, because designing takes
+  longer than flying. Crewed flights will not leave without them: see *Cosmonauts and chief
+  designers* below. The tier is a separate plugin that other mods can reuse, in case other
+  ministries also want experts.
 - **The programme:** eight milestones raced against the real American timeline. Getting
   there first pays in dollars and loyalty; getting there second pays less. Whenever the
   Americans get somewhere first, a notification tells you so and the citizens take it
@@ -112,7 +113,8 @@ there afterwards still pays the catch-up reward.
    means kerosene, liquid oxygen, the spacecraft and, for anyone breathing, food.
    The Proton burns hypergolic propellant instead, which is exactly as pleasant as it
    sounds.
-4. **Staff the flight.** Crewed milestones need trained cosmonauts, and from the Moon
+4. **Staff the flight.** Crewed milestones need trained cosmonauts (see *Cosmonauts and
+   chief designers*), and from the Moon
    probe onwards up to three tracking stations must follow the flight.
 5. **Stand well back.**
 
@@ -138,6 +140,32 @@ Or it doesn't.
 ![The N1 on Site 110](docs/images/pad_n1.jpg)
 
 *The N1 on Site 110. Historically: four launches, four explosions, zero press releases.*
+
+## COSMONAUTS AND CHIEF DESIGNERS
+
+Both are trained on the job, in game days, by the `experts` plugin. Enable it in Republic Mod
+Loader, or nobody graduates.
+
+| | Cosmonauts | Chief designers |
+|---|---|---|
+| Where | Cosmonaut Training Centre (Star City), unlocked by *Manned Spaceflight* | Design Bureau (OKB-1), unlocked by the *Rocket Research Institute* |
+| Who | graduates aged 23 to 35, health 80 % or better, working there | graduates aged 30 to 65, health 50 % or better, working there |
+| Class | 40 seats | 20 seats |
+| Time | one year, from graduate (education 2.0) to expert (3.0) | two years to expert; they go on to 3.6 |
+
+- **Speed:** a class trains at full speed when its building has as many eligible graduates
+  on staff that day as it has seats. With fewer, it is proportionally slower: 20 of 40
+  take two years.
+- **Seats are kept:** the game hands out jobs day by day, so a trainee keeps the seat even
+  after moving to another job, and keeps training while the building stays staffed.
+  Progress is stored on the citizen, so saves keep it.
+- **Hire young:** a cosmonaut trainee who turns 36, or drops below 80 % health, leaves the
+  class.
+- **Crew:** cosmonauts and chief designers both count as experts, and flights do not use
+  them up. The first man in space needs one, the spacewalk two, rendezvous and docking
+  three, the Moon landing two.
+- **Tuning:** training time, class sizes, ages and health limits are in
+  `mod/plugins/experts/experts.ini`.
 
 ## NOT INCLUDED
 
