@@ -7,7 +7,8 @@
     python tools/workshop_upload.py republic_in_ruins create --only words     # new items; prints their ids
     python tools/workshop_upload.py space_race collection                     # the collection of all items
 
-Mods: space_race (tools/space_workshop.py), republic_in_ruins (tools/yearzero_workshop.py); each
+Mods: space_race (tools/space_workshop.py), republic_in_ruins (tools/yearzero_workshop.py), tram_do
+(tools/tramdo_workshop.py); each
 packer's workshop_items() is the source of truth for ids, titles, store pages, visibility and
 Required Items.
 
@@ -48,7 +49,7 @@ sys.path.insert(0, os.path.join(ROOT, 'tools'))
 GAME = os.environ.get('WRSR_GAME', r'C:\Program Files (x86)\Steam\steamapps\common\SovietRepublic')
 WIP = os.path.join(GAME, 'media_soviet', 'workshop_wip')
 APP = 784150
-MODS = {'space_race': 'space_workshop', 'republic_in_ruins': 'yearzero_workshop'}
+MODS = {'space_race': 'space_workshop', 'republic_in_ruins': 'yearzero_workshop', 'tram_do': 'tramdo_workshop'}
 FIELDS = ('title', 'description', 'preview', 'content', 'visibility')
 ACTIONS = ('required', 'create', 'collection')
 
@@ -322,7 +323,7 @@ def check(steam, packer, its, fields):
         if page:
             if page.get('title') != i['title']:
                 print('    title differs: live %r' % page.get('title'))
-            if page.get('description', '').replace('\r\n', '\n').strip() != i['description'].replace('\r\n', '\n').strip():
+            if same_text(page.get('description', '')) != same_text(i['description']):
                 print('    description differs from the packer')
             if STEAM_VISIBILITY.get(i['visibility']) != page.get('visibility'):
                 print('    visibility: live %s, the packer says %s' % (VISIBILITY_NAME.get(page.get('visibility')),
@@ -350,8 +351,23 @@ def upload(steam, its, fields, note):
     after = live([i['id'] for i in its])
     for i in its:
         b, a = before.get(i['id']), after.get(i['id'])
-        if a and b:
-            print('%-18s %s' % (i['key'], 'updated on Steam' if a['time_updated'] > b['time_updated'] else 'Steam still shows the old time - check the page'))
+        if not (a and b):
+            continue
+        # Steam moves time_updated for a new preview or new files only, not for a text edit:
+        # text is checked by comparing it, the rest by the time
+        wrong = []
+        if 'title' in fields and a.get('title') != i['title']:
+            wrong.append('title')
+        if 'description' in fields and same_text(a.get('description', '')) != same_text(i['description']):
+            wrong.append('description')
+        if ('preview' in fields or 'content' in fields) and not a['time_updated'] > b['time_updated']:
+            wrong.append('update time')
+        print('%-18s %s' % (i['key'], 'live on Steam' if not wrong else
+                            'Steam does not show the new %s yet - check the page in a minute' % ' / '.join(wrong)))
+
+
+def same_text(s):
+    return s.replace('\r\n', '\n').strip()
 
 
 def create(steam, its):
