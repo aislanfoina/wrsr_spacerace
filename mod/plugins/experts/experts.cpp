@@ -43,8 +43,8 @@
 
 static const TsmHost* H;
 
-#define RVA_TICK_ALL   0x152520 // v1.2.0.8; was 0x139A70 in 1.1.1.13
-#define CTX_PERSONS    0x12758 // v1.2.0.8; was 0x126A8 in 1.1.1.13
+#define RVA_TICK_ALL   0x1523B0 // v1.2.0.9; was 0x152520 in 1.2.0.8, 0x139A70 in 1.1.1.13
+#define CTX_PERSONS    0x12760 // v1.2.0.9; was 0x12758 in 1.2.0.8, 0x126A8 in 1.1.1.13
 #define CTX_DAY        0x5B8 // v1.2.0.8; was 0x590 in 1.1.1.13
 #define CTX_YEAR       0x5BC // v1.2.0.8; was 0x594 in 1.1.1.13
 #define PER_WORKPLACE  0x80

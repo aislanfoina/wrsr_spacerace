@@ -1,6 +1,6 @@
 // spacerace.cpp - the Space Race in any game: research branch, names, programme.
 //
-// Game build: 1.2.0.8 (ported 2026-11-24 via 1.1.1.13; tools/port_scan.py --verify checks the hook
+// Game build: 1.2.0.9 (ported 2026-11-25 from 1.2.0.8, which came via 1.1.1.13; tools/port_scan.py --verify checks the hook
 // addresses). Call-site addresses in these notes that the code never touches are the 1.1.1.9 ones.
 //
 // Four small jobs, all at start-up except the last:
@@ -67,20 +67,20 @@
 
 static const TsmHost* H;
 
-#define RVA_SCEN_ENUM      0x5F2FC0 // v1.2.0.8; was 0x5CB750 in 1.1.1.13
-#define RVA_STR_ASSIGN     0xA69F0 // v1.2.0.8; was 0x8EB20 in 1.1.1.13
-#define RVA_SCEN_NAME      0xA32708 // v1.2.0.8; was 0x9E8648 in 1.1.1.13
-#define RVA_SCEN_MISSION   0xA32728 // v1.2.0.8; was 0x9E8668 in 1.1.1.13
-#define RVA_SCEN_AUTOSTART 0xA32748 // v1.2.0.8; was 0x9E8688 in 1.1.1.13
+#define RVA_SCEN_ENUM      0x5F3290 // v1.2.0.9; was 0x5F2FC0 in 1.2.0.8, 0x5CB750 in 1.1.1.13
+#define RVA_STR_ASSIGN     0xA6880 // v1.2.0.9; was 0xA69F0 in 1.2.0.8, 0x8EB20 in 1.1.1.13
+#define RVA_SCEN_NAME      0xA32710 // v1.2.0.9; was 0xA32708 in 1.2.0.8, 0x9E8648 in 1.1.1.13
+#define RVA_SCEN_MISSION   0xA32730 // v1.2.0.9; was 0xA32728 in 1.2.0.8, 0x9E8668 in 1.1.1.13
+#define RVA_SCEN_AUTOSTART 0xA32750 // v1.2.0.9; was 0xA32748 in 1.2.0.8, 0x9E8688 in 1.1.1.13
 #define STRING_ID_MIN      591000
 #define STRING_ID_MAX      591999
 
 static const unsigned char kEnumPro[18] = { 0x40, 0x55, 0x41, 0x54, 0x41, 0x55, 0x41, 0x56, 0x41, 0x57,
                                             0x48, 0x8D, 0xAC, 0x24, 0x90, 0xDE, 0xFF, 0xFF };
 
-#define RVA_TICK_ALL       0x152520 // v1.2.0.8; was 0x139A70 in 1.1.1.13
-#define RVA_ADD_CHILD      0x3DA6A0 // v1.2.0.8; was 0x3BB830 in 1.1.1.13
-#define CTX_BUILDINGS      0x11BB0 // v1.2.0.8; was 0x11B08 in 1.1.1.13
+#define RVA_TICK_ALL       0x1523B0 // v1.2.0.9; was 0x152520 in 1.2.0.8, 0x139A70 in 1.1.1.13
+#define RVA_ADD_CHILD      0x3DA950 // v1.2.0.9; was 0x3DA6A0 in 1.2.0.8, 0x3BB830 in 1.1.1.13
+#define CTX_BUILDINGS      0x11BB8 // v1.2.0.9; was 0x11BB0 in 1.2.0.8, 0x11B08 in 1.1.1.13
 #define BLD_TYPEDESC       0x318
 #define BLD_NODE           0x320
 #define BLD_PARENT         0x5B0
@@ -864,6 +864,17 @@ static void LoadConfig(void)
     g_research  = GetI("general", "research", g_research);
     g_test      = GetI("general", "test_mode", g_test);
     g_newGoods  = GetI("general", "new_goods", 0) != 0;
+    // Since game 1.2.0.8 the base game has goods of its own for the space programme (lox, udmh,
+    // n2o4, kerosene), and the script struct's spare fields 16 and 17 became `kerosene` and `lox`:
+    // the added goods would collide with the game's lox, land in kerosene's field and leave the
+    // rendered programme naming fields that no longer exist. Until they are redesigned around the
+    // game's own goods, new_goods = 1 falls back to the stand-ins (the resources plugin does too).
+    if (g_newGoods)
+    {
+        LogLine("spacerace  new_goods = 1 is not available on this game version (it has its own lox and "
+                "kerosene where the added goods went) - using the vanilla stand-ins");
+        g_newGoods = 0;
+    }
     float f = GetF("general", "test_cost", g_testCost);  if (f > 0.0f) g_testCost = f;
     f = GetF("general", "link_range", g_linkRange);     if (f > 0.0f) g_linkRange = f;
 }
@@ -964,7 +975,7 @@ static void LinkPads(unsigned char* ctx)
 // is over the flag is cleared again; the script sees vehi.bDisableSell drop and
 // removes the rocket (a failure removes it after a few seconds instead).
 
-#define CTX_VEHICLES       0x128C0 // v1.2.0.8; was 0x12810 in 1.1.1.13
+#define CTX_VEHICLES       0x128C8 // v1.2.0.9; was 0x128C0 in 1.2.0.8, 0x12810 in 1.1.1.13
 #define VEH_TYPE           0x1748 // v1.2.0.8; was 0x1708 in 1.1.1.13
 #define VEH_NOSELL         0x38A
 // the vehicle's two world matrices (each followed by its inverse, then a position copy at +0x80): the
@@ -1017,8 +1028,12 @@ static ULONGLONG g_lastTickMs;
 #define ENG_PARTICLES      0x1000 // v1.2.0.8; was 0xF60 in 1.1.1.13
 typedef void* (*GetEffectFn)(void* lib, char* name);
 typedef void  (*SpawnFn)(void* effect, const float* pos, const float* dir, char a, float b, float c, char d);
+// Since game 1.2.0.8 SpawnParticles takes one more float (`...0_NMM1M@Z`); every one of the game's
+// own calls passes it the same value as the two floats before it, 1.0.
+typedef void  (*Spawn7Fn)(void* effect, const float* pos, const float* dir, char a, float b, float c, char d, float e);
 static GetEffectFn g_getEffect;
 static SpawnFn     g_spawn;
+static Spawn7Fn    g_spawn7;
 static char g_fxFlame[32] = "airplane_jet";      // under the rocket, every tick of the climb
 static char g_fxSmoke[32] = "big_firesmoke";     // the trail
 static char g_fxPad[32]   = "factory_big_white"; // steam and dust round the pad as it lifts off
@@ -1030,7 +1045,7 @@ static int g_nafter;
 
 static void Fx(char* name, float x, float y, float z, float dy)
 {
-    if (!g_getEffect || !g_spawn || !name[0]) return;
+    if (!g_getEffect || (!g_spawn && !g_spawn7) || !name[0]) return;
     unsigned char* eng = *(unsigned char**)(H->exeBase + RVA_ENGINE_PTR);
     if (!LooksLikePointer(eng) || !Readable(eng + ENG_PARTICLES, 8)) return;
     void* lib = *(void**)(eng + ENG_PARTICLES);
@@ -1038,7 +1053,8 @@ static void Fx(char* name, float x, float y, float z, float dy)
     void* fx = g_getEffect(lib, name);
     if (!fx) return;
     float pos[3] = { x, y, z }, dir[3] = { 0.0f, dy, 0.0f };
-    g_spawn(fx, pos, dir, 1, 1.0f, 1.0f, 0);
+    if (g_spawn7) g_spawn7(fx, pos, dir, 1, 1.0f, 1.0f, 0, 1.0f);
+    else          g_spawn(fx, pos, dir, 1, 1.0f, 1.0f, 0);
 }
 
 // a rocket's launch load, goods named as the settings name them, taken as the current goods
@@ -1662,7 +1678,7 @@ const RocketLoad* RocketType(unsigned char* vt);
 // asking RVA_RES_FIELD(vm, name) for its byte offset in the Resources struct: a chain of
 // compares against the base game's names that answers 0 (the `workers` field!) for anything else.
 // The configured vm_goods get the four spare floats after service_material (0xE8) instead.
-#define RVA_RES_FIELD      0x5C16E0 // v1.2.0.8; was 0x59B380 in 1.1.1.13
+#define RVA_RES_FIELD      0x5C19B0 // v1.2.0.9; was 0x5C16E0 in 1.2.0.8, 0x59B380 in 1.1.1.13
 static const unsigned char kResFieldPro[15] = { 0x48, 0x89, 0x5C, 0x24, 0x08, 0x57, 0x48, 0x83, 0xEC, 0x20, 0x33, 0xDB,
                                                 0x48, 0x8B, 0xFA };
 typedef int (*ResFieldFn)(void* vm, const char* name);
@@ -1686,9 +1702,9 @@ static int DetourResField(void* vm, const char* name)
 // For each rocket with a `bill` line the vector is rewritten in place: the workers entry stays,
 // the rest become the bill's goods (never more entries than it had). Checked every couple of
 // seconds, so a type the engine rebuilds is rewritten again.
-#define RVA_RES_VECTOR     0xA2B268 // v1.2.0.8; was 0x9E11C0 in 1.1.1.13
+#define RVA_RES_VECTOR     0xA2B270 // v1.2.0.9; was 0xA2B268 in 1.2.0.8, 0x9E11C0 in 1.1.1.13
 #define RES_STRIDE_BYTES   896      // v1.2.0.8; was 832 in 1.1.1.13 (61 vanilla records now)
-#define RVA_VEH_TYPES      0xA31810 // v1.2.0.8; was 0x9E7750 in 1.1.1.13
+#define RVA_VEH_TYPES      0xA31818 // v1.2.0.9; was 0xA31810 in 1.2.0.8, 0x9E7750 in 1.1.1.13
 #define VT_STRIDE          0xA0C8 // v1.2.0.8; was 0x9F08 in 1.1.1.13
 #define VT_BILL            0x8618 // v1.2.0.8; was 0x85C8 in 1.1.1.13
 
@@ -1758,7 +1774,7 @@ static void RewriteBills(void)
 // production line choosing where a finished vehicle goes (0x1CA9FB). Launch pads take only the
 // rockets launches.ini gives them (the N1 its heavy complex, the others the R-7 pad); the
 // recovery field takes no rockets. Everything else is the game's own answer.
-#define RVA_CAN_USE        0x4019C0 // v1.2.0.8; was 0x3E2840 in 1.1.1.13
+#define RVA_CAN_USE        0x401C70 // v1.2.0.9; was 0x4019C0 in 1.2.0.8, 0x3E2840 in 1.1.1.13
 static const unsigned char kCanUsePro[23] = { 0x48, 0x89, 0x5C, 0x24, 0x10, 0x48, 0x89, 0x6C, 0x24, 0x18, 0x44, 0x88,
                                               0x4C, 0x24, 0x20, 0x56, 0x57, 0x41, 0x54, 0x41, 0x55, 0x41, 0x56 };
 typedef char (*CanUseFn)(void* ctx, unsigned char* bld, unsigned char* vt, char flag, void* extra);
@@ -1871,7 +1887,9 @@ extern "C" __declspec(dllexport) int TsmPluginStart(void)
     if (c3d)
     {
         g_getEffect = (GetEffectFn)GetProcAddress(c3d, "?GetEffect@C3D_PARTICLEFFECT_LIBRARY@@QEAAPEAVC3D_PARTICLEFFECT@@PEAD@Z");
-        g_spawn     = (SpawnFn)GetProcAddress(c3d, "?SpawnParticles@C3D_PARTICLEFFECT@@QEAAXVC3DVECTOR3@@0_NMM1@Z");
+        g_spawn7    = (Spawn7Fn)GetProcAddress(c3d, "?SpawnParticles@C3D_PARTICLEFFECT@@QEAAXVC3DVECTOR3@@0_NMM1M@Z");
+        if (!g_spawn7)
+            g_spawn = (SpawnFn)GetProcAddress(c3d, "?SpawnParticles@C3D_PARTICLEFFECT@@QEAAXVC3DVECTOR3@@0_NMM1@Z");
     }
     // other RML plugins (helicopter distribution office, rolling stock road transport) hook this
     // too, with a 14-byte absolute jump (FF 25 00000000 <address>): chain on exactly that jump
@@ -1909,7 +1927,7 @@ extern "C" __declspec(dllexport) int TsmPluginStart(void)
         LogLine("spacerace  TickAllBuildings hook not installed - launch pads will not be linked to the MIK");
     LogLine("spacerace  active: %d/%d hooks, %s goods, %d strings, autostart %s, pads link to a MIK within %.0f m, launch effects %s",
             hooks, (g_newGoods && g_nvm) ? 6 : 5, g_newGoods ? "new" : "stand-in", g_nstr, g_autostart ? "on" : "off", g_linkRange,
-            (g_getEffect && g_spawn) ? "on" : "OFF (exports not found)");
+            (g_getEffect && (g_spawn || g_spawn7)) ? "on" : "OFF (exports not found)");
     return 0;
 }
 

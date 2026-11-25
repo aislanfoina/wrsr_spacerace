@@ -933,3 +933,50 @@ code. Ship it with the next new game, and test whether a changed programme loads
    appear standing on the linked pad.
 7. Truck bays on the MIK, rocket plant, tracking station, LOX plant and
    instrument works are in open yard.
+
+## Game 1.2.0.9 (2026-11-25)
+
+Steam updated the game to 1.2.0.9 (a fixes patch after the official Space Program DLC) the
+morning after the 1.2.0.8 port, before that port had run in game. This time the previous
+executable had been kept (build/game_backup/1.2.0.8), so the port was a comparison, not a
+reconstruction: `tools/port_pair.py` (new) pairs the two builds' functions and maps every define.
+
+1.2.0.8 -> 1.2.0.9 (2026-11-25, `tools/port_pair.py`): both executables were at hand. Same section
+layout and the same 14,817 `.pdata` functions, so they pair by index (13,919 of the same size and
+instruction count). Code moved by -0x170..+0x2D0; the game object grew 8 bytes between +0xB650
+and +0xBCB8 (research, blocking, buildings, persons and vehicles +8; day/year, fuel mode and the
+research-off flag unchanged); some `.data` globals moved +8 (scenario strings, resource vector,
+vehicle and building type tables) while the game object, the particle pointer and the middle
+point did not; every other offset is unchanged (each counted over all paired instructions).
+Checked live: at the new offsets the research list holds 128 records of 0x138, the buildings
+list 35 and the persons list 104 in a new game; the old offsets read the neighbouring field.
+
+The 1.2.0.8 builds refused all their hooks on 1.2.0.9, as designed ("the bytes there are not the
+function this plugin was built for"). The 1.2.0.9 builds, in game (a new Flatland game, 1970,
+only our plugins enabled): every hook installed (spacerace 5/5, experts, resources, tramdo 3 with
+the set-length check recognised), RML committed cleanly, the 16 kit buildings were patched at
+load, the programme auto-started (`spacerace / race_6c98eb85`) and the game ran at speed with
+both TickAllBuildings hooks chained. Not exercised: launches, bills of parts, pad linking (no
+buildings of ours placed).
+
+The live research list also showed the official DLC's own branch (`space_rocket_fuel`,
+`space_sputnik`, `space_vostok`, `space_soyuz`, `space_proton_rocket`, `space_station`, ...). Its
+names do not collide with ours (`sr_*`), but the two programmes now overlap in theme.
+
+### The new goods meet the game's own (2026-11-25)
+
+The live resource table holds 61 records, among them `udmh`, `n2o4`, `lox` and `kerosene` - the
+base game's goods for its Space Program DLC (in the table with or without the DLC). The script
+API changed with them: `SOVIETInstructions.txt` now names `kerosene` and `lox` where
+`_Resources_reserved_16_` and `_17_` were, and ResourceField answers `lox` with +0xF0. That breaks
+`new_goods = 1` since 1.2.0.8: our `lox` would duplicate the game's, the four `vm_goods` (lox,
+hypergolic, spacecraft, avionics -> +0xEC..+0xF8) would land in kerosene's and lox's fields, and
+the rendered programme would name `_Resources_reserved_16_`/`_17_`, which no longer exist. The
+1.2.0.8 port only checked addresses and missed it.
+
+Until the goods are reworked, both plugins treat `new_goods = 1` as 0 and log it. Stand-in mode
+(the default) is unaffected: StandIn() maps unconditionally (lox -> chemicals for loads and
+recipes), and the resources alias only answers names the game does not know, so the game's own
+`lox` is never redirected. The rework: use the game's `lox` (and `udmh` + `n2o4` for the
+hypergolic pair) instead of adding our own, keep at most two `vm_goods` (reserved 18 and 19), and
+adjust the `goods_buildings` variants and the rocket bills.

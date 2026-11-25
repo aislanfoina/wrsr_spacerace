@@ -23,7 +23,7 @@
 //   rva 0x2AA7C0  ResourceGet(self, name, ...)  the choke point. Hooked inline;
 //                 a name resources.ini claims is answered with a record of our
 //                 own, everything else falls through to the real lookup.
-//   rva 0xA2B268  the vector object - begin, end, capacity. Publishing a record
+//   rva 0xA2B270  the vector object - begin, end, capacity. Publishing a record
 //                 is writing `end`; the engine fills 61 vanilla records, so
 //                 six mod resources fit without moving anything.
 //   rva 0x2A92D0  the price pass. Walks the vector and writes every record's
@@ -73,7 +73,7 @@
 // SOVIET64.exe v1.1.1.9. Verified against the prologue below before hooking, so
 // a game update makes the hook refuse to install rather than corrupt the process.
 // Was 0x2AA7C0 in v1.1.1.7; the prologue found it again 0x70 further on.
-#define DEFAULT_RESOURCEGET_RVA 0x2C6230     // v1.2.0.8; was 0x2AA7B0
+#define DEFAULT_RESOURCEGET_RVA 0x2C6380     // v1.2.0.9; was 0x2C6230 in 1.2.0.8, 0x2AA7B0 in 1.1.1.13
 
 static const BYTE kResourceGetPrologue[] = {
     0x40, 0x55,                                     // push rbp
@@ -131,10 +131,10 @@ static BYTE* g_baseCandidate;
 static int   g_nameOff = -1;   // offset of the inline name buffer inside a record
 static bool  g_layoutDone;
 
-// The global std::vector holding the resource records, found at SOVIET64+0xA2B268
+// The global std::vector holding the resource records, found at SOVIET64+0xA2B270
 // by scanning for a begin/end pair pointing at the array.
 struct ResVector { BYTE* begin; BYTE* end; BYTE* cap; };
-#define DEFAULT_RESOURCE_VECTOR_RVA 0xA2B268  // v1.2.0.8; was 0x9E11C0
+#define DEFAULT_RESOURCE_VECTOR_RVA 0xA2B270  // v1.2.0.9; was 0xA2B268 in 1.2.0.8, 0x9E11C0 in 1.1.1.13
 static DWORD g_vecRva = DEFAULT_RESOURCE_VECTOR_RVA;
 
 // The engine's own cache of hand-picked records, and the reason relocation used
@@ -320,7 +320,7 @@ static bool g_warnedCapacity;
 // 0x2FBB95, each time followed by 0x2A9F40.
 // v1.1.1.9; was 0x2A92D0. Confirmed by what it reads rather than by the shift:
 // the function still walks the resource vector through self+0xC2B0/+0xC2B8.
-#define DEFAULT_PRICEPASS_RVA 0x2C4D40     // v1.2.0.8; was 0x2A92C0
+#define DEFAULT_PRICEPASS_RVA 0x2C4E90     // v1.2.0.9; was 0x2C4D40 in 1.2.0.8, 0x2A92C0 in 1.1.1.13
 
 static const BYTE kPricePassPrologue[] = {
     0x48, 0x89, 0x6C, 0x24, 0x18,   // mov  [rsp+18h], rbp
@@ -2099,7 +2099,7 @@ static wchar_t* h_GetString(void* self, int id)
 //                 second, shared function afterwards; neither matters here -
 //                 a post-hook only needs it called once per customhouse per
 //                 tick, which the dispatcher already guarantees.
-#define P_CUSTOMHOUSE_TICK_RVA 0x19E300    // v1.2.0.8; was 0x185500
+#define P_CUSTOMHOUSE_TICK_RVA 0x19E190    // v1.2.0.9; was 0x19E300 in 1.2.0.8, 0x185500 in 1.1.1.13
 
 static const BYTE kCustomsTickPrologue[] = {
     0x48, 0x8B, 0xC4,                            // mov  rax,rsp
@@ -2108,7 +2108,7 @@ static const BYTE kCustomsTickPrologue[] = {
     0x48, 0x81, 0xEC, 0x90, 0x00, 0x00, 0x00     // sub  rsp,0x90
 };
 
-#define P_CUSTOMS_SLOT_PUSH_RVA 0xC9150     // v1.2.0.8; was 0xB14E0. std::vector<Slot>::push_back, 16-byte value
+#define P_CUSTOMS_SLOT_PUSH_RVA 0xC8FE0     // v1.2.0.9; was 0xC9150 in 1.2.0.8, 0xB14E0 in 1.1.1.13. std::vector<Slot>::push_back, 16-byte value
 
 #define B_STORAGES         0x970      // building -> vector<Storage>, stride 0xE0
 #define STORAGE_STRIDE     0xE0
@@ -2334,7 +2334,7 @@ static DWORD ReadResourceRva(const char* ini, const char* section, const char* k
     const DWORD rva = strtoul(value, &end, 0);
     if (rva == previous)
     {
-        Logf("resource  %s uses the v1.1.1.13 default 0x%X; using 0x%X", key, rva, current);
+        Logf("resource  %s uses the 1.2.0.8 default 0x%X; using 0x%X", key, rva, current);
         return current;
     }
     if (end == value || *end || !rva || rva >= H->exeSize)
@@ -2369,10 +2369,15 @@ extern "C" __declspec(dllexport) int TsmPluginStart(void)
     // game's, and a save that still names them reads each as its stand-in
     char spacerace[MAX_PATH];
     _snprintf_s(spacerace, sizeof spacerace, _TRUNCATE, "%s\\spacerace.ini", g_selfDir);
-    bool aliasOnly = GetFileAttributesA(spacerace) != INVALID_FILE_ATTRIBUTES && GetPrivateProfileIntA("general", "new_goods", 0, spacerace) == 0;
+    bool aliasOnly = GetFileAttributesA(spacerace) != INVALID_FILE_ATTRIBUTES;
+    // game 1.2.0.8+ has its own lox (and kerosene in the script fields the added goods used): new_goods = 1
+    // is off until the goods are redesigned around them - the spacerace plugin falls back the same way
+    if (aliasOnly && GetPrivateProfileIntA("general", "new_goods", 0, spacerace) != 0)
+        Logf("resource  new_goods = 1 is not available on this game version (it has its own lox) - "
+             "adding nothing; the six names a save may hold are read as their stand-ins");
     if (aliasOnly && !LoadAliases(g_selfDir))
     {
-        Logf("resource  spacerace.ini new_goods = 0 - no mod resources, saves stay the base game's");
+        Logf("resource  stand-in goods - no mod resources, saves stay the base game's");
         return 0;
     }
 
@@ -2387,8 +2392,8 @@ extern "C" __declspec(dllexport) int TsmPluginStart(void)
         return 1;
     }
 
-    g_resRva = ReadResourceRva(ini, "resources", "resource_rva", DEFAULT_RESOURCEGET_RVA, 0x2AA7B0);
-    g_vecRva = ReadResourceRva(ini, "resources", "resource_vector_rva", DEFAULT_RESOURCE_VECTOR_RVA, 0x9E11C0);
+    g_resRva = ReadResourceRva(ini, "resources", "resource_rva", DEFAULT_RESOURCEGET_RVA, 0x2C6230);
+    g_vecRva = ReadResourceRva(ini, "resources", "resource_vector_rva", DEFAULT_RESOURCE_VECTOR_RVA, 0xA2B268);
     // Read as a string, not through configInt: GetPrivateProfileInt answers 0
     // for anything negative, which would silently turn `resource_capacity = -1`
     // - "never move the array" - into "size it automatically", the opposite.
@@ -2398,11 +2403,11 @@ extern "C" __declspec(dllexport) int TsmPluginStart(void)
     g_priceHook    = CfgInt(ini, "resources", "price_hook", g_priceHook);
     g_priceReport  = CfgInt(ini, "resources", "price_report", g_priceReport);
     g_customReport = CfgInt(ini, "resources", "custom_report", g_customReport);
-    g_priceRva = ReadResourceRva(ini, "resources", "price_pass_rva", DEFAULT_PRICEPASS_RVA, 0x2A92C0);
+    g_priceRva = ReadResourceRva(ini, "resources", "price_pass_rva", DEFAULT_PRICEPASS_RVA, 0x2C4D40);
 
     g_customsHook  = CfgInt(ini, "customs", "hook",  g_customsHook);
     g_customsProbe = CfgInt(ini, "customs", "probe", g_customsProbe);
-    g_customsTickRva = ReadResourceRva(ini, "customs", "customhouse_tick_rva", P_CUSTOMHOUSE_TICK_RVA, 0x185500);
+    g_customsTickRva = ReadResourceRva(ini, "customs", "customhouse_tick_rva", P_CUSTOMHOUSE_TICK_RVA, 0x19E300);
 
     g_hRes = TsmOpenLog("tesmioloader.resources.log");
     const char* hdr = "; name                     which-arg  return value   discovering call site\r\n";
@@ -2428,7 +2433,7 @@ extern "C" __declspec(dllexport) int TsmPluginStart(void)
         return 1;
     if (aliasOnly)
     {
-        Logf("resource  spacerace.ini new_goods = 0 - no mod resources, saves stay the base game's; "
+        Logf("resource  stand-in goods - no mod resources, saves stay the base game's; "
              "%d new goods a save may still hold are read as their stand-ins", g_aliasCount);
         return 0;
     }

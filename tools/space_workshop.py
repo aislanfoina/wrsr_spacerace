@@ -33,7 +33,7 @@ RETIRED = [3787969749]
 
 # key: (folder, Steam item id, item type, name). Created in the game on 2026-10-05 (dev ids were 90001xx).
 ITEMS = {
-    'package': ('mod/packages/space_race', 3814051864, 'WORKSHOP_ITEMTYPE_SCRIPT', 'Space Race [1.2.0.8]'),
+    'package': ('mod/packages/space_race', 3814051864, 'WORKSHOP_ITEMTYPE_SCRIPT', 'Space Race [1.2.0.9]'),
     'kit': ('mod/buildings/space_kit', 3814049784, 'WORKSHOP_ITEMTYPE_BUILDING', 'Space Race Kit'),
     'sr_sputnik': ('mod/vehicles/sr_sputnik', 3814050253, 'WORKSHOP_ITEMTYPE_VEHICLE', 'Space Race: R-7 Sputnik'),
     'sr_vostok': ('mod/vehicles/sr_vostok', 3814050457, 'WORKSHOP_ITEMTYPE_VEHICLE', 'Space Race: Vostok-K'),
@@ -71,7 +71,7 @@ The objective is simple: [b]put a Soviet cosmonaut on the Moon before 20 July 19
 [*][b]Launches[/b]: the propellant and payload are taken from storages near the pad, and the rocket climbs away on flame and smoke. Or it explodes.
 [*][b]Cosmonauts, a fourth education tier[/b]: graduates who work at the Cosmonaut Training Centre become experts; OKB-1 trains chief designers (see below).
 [*][b]The programme[/b]: eight milestones against the real American timeline. Coming first pays in dollars and loyalty.
-[*][b]Six new goods, if the republic wants them[/b]: rocket stages, rocket engines, avionics, liquid oxygen, hypergolic propellant and spacecraft.
+[*][b]Six new goods, if the republic wants them[/b]: rocket stages, rocket engines, avionics, liquid oxygen, hypergolic propellant and spacecraft. [i]Resting on game 1.2.0.8 and later: the game now has its own liquid oxygen and rocket fuels, and the new goods will be reworked around them. Until then the programme runs on the stand-ins.[/i]
 [/list]
 The programme sleeps until the republic researches the Rocket Research Institute [b]and[/b] builds the Design Bureau (OKB-1): no windows, no objectives and no Americans keeping score until then. Building OKB-1 is how the republic signs up.
 
@@ -89,7 +89,7 @@ The programme sleeps until the republic researches the Rocket Research Institute
 [*]Run Republic Mod Loader (RepublicModLoader.exe in the pack's folder), enable the Space Race items and their plugins (spacerace, experts, resources), and launch the game.
 [*]Load your republic or start a new one. Research the Rocket Research Institute, build the Design Bureau (OKB-1), and the programme takes it from there.
 [/olist]
-Requires Workers & Resources: Soviet Republic [b]1.2.0.8[/b]: the plugins patch this exact build.
+Requires Workers & Resources: Soviet Republic [b]1.2.0.9[/b]: the plugins patch this exact build.
 
 [img]%(img)spad_r7.jpg[/img]
 [i]A Vostok-K in the arms of Gagarin's Start.[/i]
@@ -103,13 +103,13 @@ Both are trained on the job, in game days, by the [b]experts[/b] plugin (enable 
 A trainee keeps the seat and the progress (saves keep it) even when the game gives them another job. Both count for crewed flights and are not used up: a flight needs at most three. Training times, class sizes and the limits are in [b]plugins\\experts.ini[/b].
 
 [h2]SAVES[/h2]
-Out of the box ([b]new_goods = 0[/b]) the mod adds no goods, and your existing republic can join the race as it is: liquid oxygen travels as chemicals, rocket parts as mechanical components and spacecraft as electronics. The six new goods ([b]new_goods = 1[/b]) can be switched on for an existing republic too: load it and they join the economy. Switched off again, whatever is in stock becomes its stand-in and the next save is a plain one. Save once after each switch, and keep a backup: the Party always does.
+Out of the box ([b]new_goods = 0[/b]) the mod adds no goods, and your existing republic can join the race as it is: liquid oxygen travels as chemicals, rocket parts as mechanical components and spacecraft as electronics. The six new goods ([b]new_goods = 1[/b], resting on game 1.2.0.8 and later, see above) can be switched on for an existing republic too: load it and they join the economy. Switched off again, whatever is in stock becomes its stand-in and the next save is a plain one. Save once after each switch, and keep a backup: the Party always does.
 
 [h2]THE PLAN IS NEGOTIABLE[/h2]
 Every number is a recommendation from the Central Committee, not a law of physics. [b]plugins\\spacerace.ini[/b] in this item's folder holds them all, explained: research years and costs, the day the Americans reach each milestone (or never), failure chances, cosmonauts and tracking stations, launch loads, rocket parts, rewards, and the cost, staff and recipes of every building. A running republic keeps the programme rules it began with, so tampering with the timeline cannot break a race already under way. (Steam replaces the file when the mod updates: keep a copy of your changes.)
 
 [h2]STATUS[/h2]
-Early access, updated for game version 1.2.0.8. Every feature has run in the game, but nobody has played the whole race through yet. Reports are welcome, especially from comrades who reached the Moon.
+Early access, updated for game version 1.2.0.9. Every feature has run in the game, but nobody has played the whole race through yet. Reports are welcome, especially from comrades who reached the Moon.
 
 [h2]REPORTING A LAUNCH FAILURE[/h2]
 Tell us what happened, what you were doing, and attach the Republic Mod Loader log. Unlike TASS, we want to hear about failures.
@@ -183,12 +183,12 @@ Everything the Space Race needs, in one place. Press [b]Subscribe to all[/b] and
 [img]%(img)srockets.jpg[/img]
 
 [list]
-[*][url=%(package)s]Space Race [1.2.0.8][/url]: the plugins. The research branch, the launches, cosmonauts and the programme against the American timeline. Start here: its page explains how to play.
+[*][url=%(package)s]Space Race [1.2.0.9][/url]: the plugins. The research branch, the launches, cosmonauts and the programme against the American timeline. Start here: its page explains how to play.
 [*][url=%(kit)s]Space Race Kit[/url]: the sixteen buildings, from Gagarin's Start to the Gagarin column.
 [*]The rockets: [url=%(sr_sputnik)s]R-7 Sputnik[/url], [url=%(sr_vostok)s]Vostok-K[/url], [url=%(sr_soyuz)s]Soyuz[/url], [url=%(sr_proton)s]Proton[/url] and [url=%(sr_n1)s]N1-L3[/url].
 [*][url=%(rml)s]WRSR Ultimate Pack[/url]: Republic Mod Loader, which runs the plugins (the pack's own plugins can be switched off).
 [/list]
-Then run Republic Mod Loader, enable the Space Race items and their plugins (spacerace, experts, resources), and launch. Requires Workers & Resources: Soviet Republic [b]1.2.0.8[/b].
+Then run Republic Mod Loader, enable the Space Race items and their plugins (spacerace, experts, resources), and launch. Requires Workers & Resources: Soviet Republic [b]1.2.0.9[/b].
 
 '''
 
@@ -198,7 +198,7 @@ def workshop_collection():
     page text, preview image, the game's visibility value and the Steam ids it holds, in order."""
     urls = dict((k, ITEM_URL % v[1]) for k, v in ITEMS.items())
     urls.update(img=IMAGES, rml=RML)
-    return {'id': COLLECTION_ID, 'title': 'Space Race [1.2.0.8]: the complete programme',
+    return {'id': COLLECTION_ID, 'title': 'Space Race [1.2.0.9]: the complete programme',
             'description': COLLECTION % urls + FOOTER, 'visibility': VISIBILITY,
             'preview': os.path.join(ROOT, 'build', 'thumbs', 'posters', 'collection.png'),
             'items': [v[1] for v in ITEMS.values()] + [RML_ITEM], 'retired': RETIRED}
