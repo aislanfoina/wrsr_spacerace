@@ -173,6 +173,9 @@ def descriptions():
 
 # Required Items on Steam: item -> the items (keys here, or Steam ids) a subscriber also needs
 REQUIRED = {'package': ['kit'] + list(ROCKETS) + [RML_ITEM]}
+# ...and the other way round: a rocket or the kit alone does nothing without the plugins (reviews
+# from players who subscribed to a rocket only, 2026-11-25), so Steam asks for the main item too
+REQUIRED.update({k: ['package'] for k in ['kit'] + list(ROCKETS)})
 
 # The Steam collection of every item plus the loader, so "Subscribe to all" brings the lot.
 # 0 until tools/workshop_upload.py creates it; then its id goes here (created 2026-10-05).
@@ -210,7 +213,7 @@ def workshop_items():
     descs = descriptions()
     return [{'key': k, 'id': v[1], 'type': v[2], 'title': v[3], 'description': descs[k], 'visibility': VISIBILITY,
              'required': [ITEMS[r][1] if r in ITEMS else r for r in REQUIRED.get(k, [])],
-             'retired': RETIRED if k in REQUIRED else []} for k, v in ITEMS.items()]
+             'retired': RETIRED if k == 'package' else []} for k, v in ITEMS.items()]
 
 
 def config(key, desc, objects):
