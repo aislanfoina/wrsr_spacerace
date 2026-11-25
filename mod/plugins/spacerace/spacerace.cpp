@@ -1,5 +1,8 @@
 // spacerace.cpp - the Space Race in any game: research branch, names, programme.
 //
+// Game build: 1.1.1.13 (ported from 1.1.1.9 on 2026-11-24; tools/port_scan.py --verify checks the hook
+// addresses). Call-site addresses in these notes that the code never touches are the 1.1.1.9 ones.
+//
 // Four small jobs, all at start-up except the last:
 //
 //   1. Install data. spacerace_data\research\*.png go to media_soviet\research
@@ -8,7 +11,7 @@
 //      Only our own files are written; nothing of the game's is touched.
 //
 //   2. Research branch. SOVIET64 reads research\research.ini with fopen after
-//      C3DPath_GetFullPath (0x2F3D12). A merged copy - the vanilla file, plus an
+//      C3DPath_GetFullPath (0x2F3D12 in 1.1.1.9). A merged copy - the vanilla file, plus an
 //      $UNLOCK_RESEARCH line in the vanilla parents named by inject.ini, plus our
 //      research_space.ini with {KIT} replaced by the building kit's item id - is
 //      written beside the DLL, and SOVIET64's fopen import is swapped so that one
@@ -22,7 +25,7 @@
 //   4. The programme. On every world load the game parses stats.ini (setting the
 //      scenario/mission std::strings at 0x9E8648 / 0x9E8668 and the auto-start
 //      flag at 0x9E8688 for $ScenarioAutoStart) and then enumerates scenarios
-//      (0x5CB7C0, one caller). A hook there sees an empty scenario - an ordinary
+//      (0x5CB750, one caller). A hook there sees an empty scenario - an ordinary
 //      game - and sets spacerace/programme with the auto-start flag, exactly what
 //      a map's "$ScenarioAutoStart spacerace programme" would do. Campaigns,
 //      tutorials, Year Zero and saves already running a scenario are left alone.
@@ -30,9 +33,9 @@
 //
 //   5. Pads to the MIK. The MIK is an aircraft production line; a finished
 //      aircraft goes to a free station of a building linked to the line
-//      (0x1CA97D), and the rocket list only opens once one is linked. A link is
+//      (0x1CA97D in 1.1.1.9), and the rocket list only opens once one is linked. A link is
 //      the child's parent pointer (building+0x5B0) plus the parent's child list
-//      (+0x5B8, added by 0x3BB8F0(game, parent, child), as the game does when it
+//      (+0x5B8, added by 0x3BB830(game, parent, child), as the game does when it
 //      creates or loads a linked building; saves keep it). The game's own way to
 //      make one at placement did not take for our pads, so a post-hook on
 //      TickAllBuildings links every unlinked launch pad (object sr_pad_*) to the
@@ -42,7 +45,7 @@
 //      spacerace.ini (the player's copy, same syntax) set the balance:
 //      - [research] years and costs, applied while the merged research.ini is built;
 //      - [building:<object>] costs, staff and production. The building-type loader
-//        opens every building.ini with the same fopen import (0x10E37E), so a kit
+//        opens every building.ini with the same fopen import (0x10E37E in 1.1.1.9), so a kit
 //        building's file is served as a patched copy in spacerace_data\buildings;
 //      - [rocket_parts] the MIK bills;
 //      - the programme: data\programme\race.tmpl has @tokens@ for [america],
@@ -64,7 +67,7 @@
 
 static const TsmHost* H;
 
-#define RVA_SCEN_ENUM      0x5CB7C0
+#define RVA_SCEN_ENUM      0x5CB750 // v1.1.1.13; was 0x5CB7C0
 #define RVA_STR_ASSIGN     0x8EB20
 #define RVA_SCEN_NAME      0x9E8648
 #define RVA_SCEN_MISSION   0x9E8668
@@ -76,7 +79,7 @@ static const unsigned char kEnumPro[18] = { 0x40, 0x55, 0x41, 0x54, 0x41, 0x55, 
                                             0x48, 0x8D, 0xAC, 0x24, 0x90, 0xDE, 0xFF, 0xFF };
 
 #define RVA_TICK_ALL       0x139A70
-#define RVA_ADD_CHILD      0x3BB8F0
+#define RVA_ADD_CHILD      0x3BB830 // v1.1.1.13; was 0x3BB8F0
 #define CTX_BUILDINGS      0x11B08
 #define BLD_TYPEDESC       0x318
 #define BLD_NODE           0x320
@@ -982,7 +985,7 @@ static int   g_nrocket;
 static GoodT g_legacyLoad[MAX_ROCKETS][MAX_GOODS];   // launches.ini's loads, for legacy missions
 static int   g_legacyNload[MAX_ROCKETS];
 static float g_legacyRadius = 450.0f;
-// added goods scripts may read: the name -> Resources-field chain (SOVIET64 0x59B3F0) knows only the
+// added goods scripts may read: the name -> Resources-field chain (SOVIET64 0x59B380) knows only the
 // base game's names, so these are answered with the spare fields _Resources_reserved_16_.._19_
 static char  g_vmGoods[4][32];
 static int   g_nvm;
@@ -1652,10 +1655,10 @@ static void Launches(unsigned char* ctx, int scan)
 const RocketLoad* RocketType(unsigned char* vt);
 
 // Scripts read goods through Resources.GetFromBuilding and friends, which place each good by
-// asking SOVIET64 0x59B3F0(vm, name) for its byte offset in the Resources struct: a chain of
+// asking SOVIET64 0x59B380(vm, name) for its byte offset in the Resources struct: a chain of
 // compares against the base game's names that answers 0 (the `workers` field!) for anything else.
 // The configured vm_goods get the four spare floats after service_material (0xE8) instead.
-#define RVA_RES_FIELD      0x59B3F0
+#define RVA_RES_FIELD      0x59B380 // v1.1.1.13; was 0x59B3F0
 static const unsigned char kResFieldPro[15] = { 0x48, 0x89, 0x5C, 0x24, 0x08, 0x57, 0x48, 0x83, 0xEC, 0x20, 0x33, 0xDB,
                                                 0x48, 0x8B, 0xFA };
 typedef int (*ResFieldFn)(void* vm, const char* name);
@@ -1746,12 +1749,12 @@ static void RewriteBills(void)
     g_billsDone = done;
 }
 
-// Which vehicle may use which pad. SOVIET64 0x3E2900(game, building, vehicle type, flag, x)
+// Which vehicle may use which pad. SOVIET64 0x3E2840(game, building, vehicle type, flag, x)
 // answers "may this vehicle type use this building" for the purchase list, assignments and a
 // production line choosing where a finished vehicle goes (0x1CA9FB). Launch pads take only the
 // rockets launches.ini gives them (the N1 its heavy complex, the others the R-7 pad); the
 // recovery field takes no rockets. Everything else is the game's own answer.
-#define RVA_CAN_USE        0x3E2900
+#define RVA_CAN_USE        0x3E2840 // v1.1.1.13; was 0x3E2900
 static const unsigned char kCanUsePro[23] = { 0x48, 0x89, 0x5C, 0x24, 0x10, 0x48, 0x89, 0x6C, 0x24, 0x18, 0x44, 0x88,
                                               0x4C, 0x24, 0x20, 0x56, 0x57, 0x41, 0x54, 0x41, 0x55, 0x41, 0x56 };
 typedef char (*CanUseFn)(void* ctx, unsigned char* bld, unsigned char* vt, char flag, void* extra);

@@ -25,11 +25,15 @@ REPO = 'https://github.com/aislanfoina/wrsr_spacerace'
 ITEM_URL = 'https://steamcommunity.com/sharedfiles/filedetails/?id=%d'
 # the README's pictures, inline on the store pages ([img]); main only changes after review, so the links hold
 IMAGES = REPO.replace('https://github.com/', 'https://raw.githubusercontent.com/') + '/main/docs/images/'
-RML = ITEM_URL % 3787969749
+# Republic Mod Loader for game 1.1.1.13 ships in the WRSR Ultimate Pack (by another modder); the original
+# RML item 3787969749 is gone from Steam. RETIRED: links the tool removes from Required Items / the collection.
+RML_ITEM = 3838038411
+RML = ITEM_URL % RML_ITEM
+RETIRED = [3787969749]
 
 # key: (folder, Steam item id, item type, name). Created in the game on 2026-10-05 (dev ids were 90001xx).
 ITEMS = {
-    'package': ('mod/packages/space_race', 3814051864, 'WORKSHOP_ITEMTYPE_SCRIPT', 'Space Race [1.1.1.9]'),
+    'package': ('mod/packages/space_race', 3814051864, 'WORKSHOP_ITEMTYPE_SCRIPT', 'Space Race [1.1.1.13]'),
     'kit': ('mod/buildings/space_kit', 3814049784, 'WORKSHOP_ITEMTYPE_BUILDING', 'Space Race Kit'),
     'sr_sputnik': ('mod/vehicles/sr_sputnik', 3814050253, 'WORKSHOP_ITEMTYPE_VEHICLE', 'Space Race: R-7 Sputnik'),
     'sr_vostok': ('mod/vehicles/sr_vostok', 3814050457, 'WORKSHOP_ITEMTYPE_VEHICLE', 'Space Race: Vostok-K'),
@@ -41,7 +45,7 @@ KIT_OBJECTS = ('pad_r7', 'pad_n1', 'mik', 'rocket_plant', 'engine_plant', 'test_
                'instruments', 'spacecraft', 'tracking', 'training', 'bureau', 'recovery', 'monument', 'gagarin')
 
 FOOTER = '''[h2]LICENCE AND CREDITS[/h2]
-GPL-3.0, source code on GitHub: [url=%(repo)s]%(repo)s[/url]. The goods plugin is a port of the one in TesmioLoader by MaxLegend; the plugins run on [url=%(rml)s]Republic Mod Loader[/url] by UltimateUniverse, whose Workshop pages also inspired the tone of this one.
+GPL-3.0, source code on GitHub: [url=%(repo)s]%(repo)s[/url]. The goods plugin is a port of the one in TesmioLoader by MaxLegend; the plugins run on Republic Mod Loader by UltimateUniverse (for 1.1.1.13 in the [url=%(rml)s]WRSR Ultimate Pack[/url]), whose Workshop pages also inspired the tone of this one.
 
 Workers & Resources: Soviet Republic is (c) 3Division. This is an independent fan-made mod, not affiliated with or endorsed by 3Division or Hooded Horse.''' % {'repo': REPO, 'rml': RML}
 
@@ -81,11 +85,11 @@ The programme sleeps until the republic researches the Rocket Research Institute
 
 [h2]HOW TO JOIN THE RACE[/h2]
 [olist]
-[*]Subscribe to this item, the [b]Space Race Kit[/b] and the five rockets (the Required Items on this page), and to [url=%(rml)s]Republic Mod Loader[/url].
-[*]Run Republic Mod Loader, enable the Space Race items and their plugins (spacerace, experts, resources), and launch the game.
+[*]Subscribe to this item and its Required Items: the [b]Space Race Kit[/b], the five rockets and the [url=%(rml)s]WRSR Ultimate Pack[/url], which carries Republic Mod Loader for 1.1.1.13 (its own plugins can be switched off).
+[*]Run Republic Mod Loader (RepublicModLoader.exe in the pack's folder), enable the Space Race items and their plugins (spacerace, experts, resources), and launch the game.
 [*]Load your republic or start a new one. Research the Rocket Research Institute, build the Design Bureau (OKB-1), and the programme takes it from there.
 [/olist]
-Requires Workers & Resources: Soviet Republic [b]1.1.1.9[/b]: the plugins patch this exact build.
+Requires Workers & Resources: Soviet Republic [b]1.1.1.13[/b]: the plugins patch this exact build.
 
 [img]%(img)spad_r7.jpg[/img]
 [i]A Vostok-K in the arms of Gagarin's Start.[/i]
@@ -101,13 +105,11 @@ A trainee keeps the seat and the progress (saves keep it) even when the game giv
 [h2]SAVES[/h2]
 Out of the box ([b]new_goods = 0[/b]) the mod adds no goods, and your existing republic can join the race as it is: liquid oxygen travels as chemicals, rocket parts as mechanical components and spacecraft as electronics. The six new goods ([b]new_goods = 1[/b]) can be switched on for an existing republic too: load it and they join the economy. Switched off again, whatever is in stock becomes its stand-in and the next save is a plain one. Save once after each switch, and keep a backup: the Party always does.
 
-[b]Saves from the first release (5 October 2026):[/b] that programme woke up on the research alone and counted the Americans from day one. A save keeps the programme it was first loaded with, so if it buried you in windows or cost you loyalty, load a save from before you subscribed: this version moves in quietly and waits for OKB-1.
-
 [h2]THE PLAN IS NEGOTIABLE[/h2]
 Every number is a recommendation from the Central Committee, not a law of physics. [b]plugins\\spacerace.ini[/b] in this item's folder holds them all, explained: research years and costs, the day the Americans reach each milestone (or never), failure chances, cosmonauts and tracking stations, launch loads, rocket parts, rewards, and the cost, staff and recipes of every building. A running republic keeps the programme rules it began with, so tampering with the timeline cannot break a race already under way. (Steam replaces the file when the mod updates: keep a copy of your changes.)
 
 [h2]STATUS[/h2]
-Early access. Every feature has run in the game, but nobody has played the whole race through yet. Reports are welcome, especially from comrades who reached the Moon.
+Early access, updated for game version 1.1.1.13. Every feature has run in the game, but nobody has played the whole race through yet. Reports are welcome, especially from comrades who reached the Moon.
 
 [h2]REPORTING A LAUNCH FAILURE[/h2]
 Tell us what happened, what you were doing, and attach the Republic Mod Loader log. Unlike TASS, we want to hear about failures.
@@ -170,7 +172,7 @@ def descriptions():
 
 
 # Required Items on Steam: item -> the items (keys here, or Steam ids) a subscriber also needs
-REQUIRED = {'package': ['kit'] + list(ROCKETS) + [3787969749]}
+REQUIRED = {'package': ['kit'] + list(ROCKETS) + [RML_ITEM]}
 
 # The Steam collection of every item plus the loader, so "Subscribe to all" brings the lot.
 # 0 until tools/workshop_upload.py creates it; then its id goes here (created 2026-10-05).
@@ -181,12 +183,12 @@ Everything the Space Race needs, in one place. Press [b]Subscribe to all[/b] and
 [img]%(img)srockets.jpg[/img]
 
 [list]
-[*][url=%(package)s]Space Race [1.1.1.9][/url]: the plugins. The research branch, the launches, cosmonauts and the programme against the American timeline. Start here: its page explains how to play.
+[*][url=%(package)s]Space Race [1.1.1.13][/url]: the plugins. The research branch, the launches, cosmonauts and the programme against the American timeline. Start here: its page explains how to play.
 [*][url=%(kit)s]Space Race Kit[/url]: the sixteen buildings, from Gagarin's Start to the Gagarin column.
 [*]The rockets: [url=%(sr_sputnik)s]R-7 Sputnik[/url], [url=%(sr_vostok)s]Vostok-K[/url], [url=%(sr_soyuz)s]Soyuz[/url], [url=%(sr_proton)s]Proton[/url] and [url=%(sr_n1)s]N1-L3[/url].
-[*][url=%(rml)s]Republic Mod Loader[/url] by UltimateUniverse: runs the plugins.
+[*][url=%(rml)s]WRSR Ultimate Pack[/url]: Republic Mod Loader for 1.1.1.13, which runs the plugins (the pack's own plugins can be switched off).
 [/list]
-Then run Republic Mod Loader, enable the Space Race items and their plugins (spacerace, experts, resources), and launch. Requires Workers & Resources: Soviet Republic [b]1.1.1.9[/b].
+Then run Republic Mod Loader, enable the Space Race items and their plugins (spacerace, experts, resources), and launch. Requires Workers & Resources: Soviet Republic [b]1.1.1.13[/b].
 
 '''
 
@@ -196,18 +198,19 @@ def workshop_collection():
     page text, preview image, the game's visibility value and the Steam ids it holds, in order."""
     urls = dict((k, ITEM_URL % v[1]) for k, v in ITEMS.items())
     urls.update(img=IMAGES, rml=RML)
-    return {'id': COLLECTION_ID, 'title': 'Space Race [1.1.1.9]: the complete programme',
+    return {'id': COLLECTION_ID, 'title': 'Space Race [1.1.1.13]: the complete programme',
             'description': COLLECTION % urls + FOOTER, 'visibility': VISIBILITY,
             'preview': os.path.join(ROOT, 'build', 'thumbs', 'posters', 'collection.png'),
-            'items': [v[1] for v in ITEMS.values()] + [3787969749]}
+            'items': [v[1] for v in ITEMS.values()] + [RML_ITEM], 'retired': RETIRED}
 
 
 def workshop_items():
     """The items as tools/workshop_upload.py reads them: key, Steam id, game item type, title,
-    store page text, the game's visibility value and Required Items (Steam ids)."""
+    store page text, the game's visibility value, Required Items (Steam ids) and the retired ones to drop."""
     descs = descriptions()
     return [{'key': k, 'id': v[1], 'type': v[2], 'title': v[3], 'description': descs[k], 'visibility': VISIBILITY,
-             'required': [ITEMS[r][1] if r in ITEMS else r for r in REQUIRED.get(k, [])]} for k, v in ITEMS.items()]
+             'required': [ITEMS[r][1] if r in ITEMS else r for r in REQUIRED.get(k, [])],
+             'retired': RETIRED if k in REQUIRED else []} for k, v in ITEMS.items()]
 
 
 def config(key, desc, objects):

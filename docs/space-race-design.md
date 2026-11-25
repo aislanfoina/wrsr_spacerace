@@ -860,6 +860,27 @@ identically to Python for both goods modes (`race_6c98eb85`, `race_06f5fb56`), a
 - each window variant;
 - a shifted American notification.
 
+### Port to game version 1.1.1.13 (2026-11-24, built, verified offline)
+
+The game updated to 1.1.1.13 (`SOVIET64.exe` sha256 `4df5fbec...`, the build TesmioLoader 0.3.7
+ported to). Republic Mod Loader's Workshop item 3787969749 is gone; RML for 1.1.1.13 ships in the
+WRSR Ultimate Pack (3838038411, another modder's), now the Required Item and the collection's loader.
+
+- **Code moved, data did not.** `.data` globals (game object, scenario strings, resource and
+  vehicle-type vectors) and every structure offset checked are unchanged; functions moved by region.
+- `tools/port_scan.py` found every hook by its recorded prologue among `.pdata` function starts:
+  ScenarioEnumeration 0x5CB7C0 -> 0x5CB750, ResourceField 0x59B3F0 -> 0x59B380, CanUseBuilding
+  0x3E2900 -> 0x3E2840, TickAllBuildings unchanged; resources: ResourceGet 0x2AA7B0, price pass
+  0x2A92C0, customs tick 0x185500 - the same as TesmioLoader's own port.
+- Call-only helpers, from inside the new code: add-child 0x3BB8F0 -> 0x3BB830 (null-checks the
+  parent, then the parent's +0x5B8 list; called by the building loader and placement); the string
+  assign 0x8EB20 and the scenario globals 0x9E8648/68/88 unchanged (the new enumeration calls
+  0x8EB20 on 0x9E8648 and tests/clears 0x9E8688). Rocket bills: 0x3F8D10 -> 0x3F8C50 (still writes
+  vt+0x85C8).
+- Manifests: `supportedGameVersions` 1.1.1.13 and the observed-symbol names; `resources.ini`
+  `resource_rva`; the vendored resources plugin from TesmioLoader's 1.1.1.13 commit.
+- `tools/port_scan.py --verify`: 12/12 hook sites match their prologues. **Not yet run in game.**
+
 ### Pending: showing the experts in game (done in the launch-sequence programme)
 
 Before it, cosmonauts showed only in `rml-runtime.log` ("N experts in the republic", "promoted") and as

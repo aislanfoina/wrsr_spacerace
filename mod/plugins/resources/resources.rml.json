@@ -11,19 +11,19 @@
     "max": 1
   },
   "supportedGameVersions": [
-    "1.1.1.9"
+    "1.1.1.13"
   ],
   "requiredSymbols": [],
   "optionalSymbols": [],
   "hookIntents": [
     {
-      "symbol": "wrsr.observed.rva_002aa830",
+      "symbol": "wrsr.observed.rva_002aa7b0",
       "interaction": "pre-hook",
       "phase": "runtime",
       "temperature": "UNKNOWN"
     },
     {
-      "symbol": "wrsr.observed.rva_002a9340",
+      "symbol": "wrsr.observed.rva_002a92c0",
       "interaction": "pre-hook",
       "phase": "runtime",
       "temperature": "UNKNOWN"
