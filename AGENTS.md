@@ -128,7 +128,9 @@ Jobs:
 7. **Launches:** the script flags the rocket with `Vehicle_SetCanSell(veh, 0)` (byte vehicle+0x38A,
    readable as `vehi.bDisableSell`); the plugin sees the flag, takes the rocket's load from STORAGE
    buildings within the radius (`TakeLoad`), lifts both world matrices for `climb_seconds` (height
-   `1.2 s^2 + 0.25 s^3`), spawns flame/smoke/pad steam particles, then clears the flag; the script
+   `1.2 s^2 + 0.25 s^3`), spawns flame/smoke/pad steam particles (C3DDLL64 `SpawnParticles` takes one
+   more float since 1.2.0.8 - the plugin looks up that export first and passes 1.0, as every game call
+   does; before 2026-11-25 the lookup failed and effects were silently off), then clears the flag; the script
    sells the rocket. A rocket removed mid-climb (failure) gets an explosion and 8 s of smoke.
 8. **Rocket bills:** each rocket type's bill of parts (type+0x85C8, 16-byte {Resource*, float}
    entries, computed from empty weight; +0x8618 in 1.2.0.8) is rewritten to `[rocket_parts]` (new goods
@@ -186,12 +188,13 @@ building  +0x318 type descriptor (ident "<item>/<object>" at +0, BUILDINGTYPE at
 person    +0x40 building it is in now (never home)  +0x58 customs house it immigrated through
           +0x80 workplace  +0xA8 education  +0xD4 age  +0xE0 health (unchanged; record 0x750)
 vehicle   +0x1748 type (ident at type+0x200)  +0x38A no-sell flag
-          two C3D_NODEs at +0xD98 / +0x10B8: world matrices +0xDA0 / +0x10C0 (each followed by its
-          inverse), position copies +0xE20 / +0x1140
+          world matrices at +0xD98 / +0x10B8 (each followed by its inverse), position copies
+          +0xE18 / +0x1138 (read live from trams 2026-11-25; the 1.2.0.8 port's +0xDA0 / +0x10C0
+          were 8 bytes off and would have broken the climb)
 vehicle types   vector at RVA 0xA31818, stride 0xA0C8: kind +0x2B8, bill of parts +0x8618
 building types  table at RVA 0xA30AF0, stride 0xE98 (construction phases: re-measure before use)
 resources       vector at RVA 0xA2B270, stride 0x380 (61 vanilla records), name at +0
-particles       library at [RVA 0x9DDC88]+0x1000; C3DDLL64 GetEffect(lib, char*), SpawnParticles(effect, pos*, dir*, 1, 1.0, 1.0, 0)
+particles       library at [RVA 0x9DDC88]+0x1000; C3DDLL64 GetEffect(lib, char*), SpawnParticles(effect, pos*, dir*, 1, 1.0, 1.0, 0, 1.0) (last float new in 1.2.0.8)
 scenario        std::strings at RVA 0xA32710 (scenario) / 0xA32730 (mission), auto-start byte 0xA32750;
                 assign helper 0xA6880(this, ptr, len)
 building ini    loaded through the fopen import (by the type loader 0x136080)
@@ -207,11 +210,13 @@ from the enumeration's tail (same `0x1E45`-byte function), add-child by its shap
 by a `+0x2B8` kind read), the vehicle list and type table by reference counts beside the person
 list (a uniform +0xB0 in the game object), the type stride by the table's index multiplications
 (69 x `imul 0xA0C8`), the bill by the +0x50 shift that moved the trainset list (+0x7C58) and train
-groups (+0x9708), the matrices from `C3D_NODE::GetMatrix` calls (nodes at +0xD98 / +0x10B8, so the
-1.1.1.13 matrices +0xD60 / +0x1080 were node+8), the particle library from the game's GetEffect
+groups (+0x9708), the matrices from `C3D_NODE::GetMatrix` calls on +0xD98 / +0x10B8 (taken then as
+nodes with the matrix at +8, as in 1.1.1.13 - wrong: a live dump on 1.2.0.9 shows the orthonormal
+rows starting at +0xD98 / +0x10B8 themselves), the particle library from the game's GetEffect
 calls (`mov rcx,[rcx+0x1000]`, 54 of 61). Unchanged in 1.2.0.9 except where noted below. Seen in game
-(1.2.0.9): the lists, research records, scenario globals and every hook; not yet exercised: the
-vehicle-type ident, the matrices and the particle library (no rocket was built in that test).
+(1.2.0.9, memory read live): the lists, research records, scenario globals, every hook, the
+vehicle-type table and ident, vehicle matrices, the particle library pointer; not yet exercised: a
+launch (climb, particles - `SpawnParticles` gained a float in 1.2.0.8, see section 5), bills, pads.
 
 1.2.0.8 -> 1.2.0.9 (2026-11-25, `tools/port_pair.py`): both executables were at hand. Same section
 layout and the same 14,817 `.pdata` functions, so they pair by index (13,919 of the same size and

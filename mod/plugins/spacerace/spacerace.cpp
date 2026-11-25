@@ -978,10 +978,12 @@ static void LinkPads(unsigned char* ctx)
 #define CTX_VEHICLES       0x128C8 // v1.2.0.9; was 0x128C0 in 1.2.0.8, 0x12810 in 1.1.1.13
 #define VEH_TYPE           0x1748 // v1.2.0.8; was 0x1708 in 1.1.1.13
 #define VEH_NOSELL         0x38A
-// the vehicle's two world matrices (each followed by its inverse, then a position copy at +0x80): the
-// matrix of the C3D_NODEs embedded at +0xD98 / +0x10B8, as GetMatrix@C3D_NODE is called on them
-#define VEH_MATRIX_A       0xDA0    // v1.2.0.8; was 0xD60 in 1.1.1.13
-#define VEH_MATRIX_B       0x10C0   // v1.2.0.8; was 0x1080 in 1.1.1.13
+// the vehicle's two world matrices (each followed by its inverse, then a position copy at +0x80).
+// Read from a live 1.2.0.9 game (2026-11-25, trams in a save): the orthonormal rows start at +0xD98
+// and +0x10B8, translation at +0x30, copy at +0xE18 / +0x1138. The 1.2.0.8 port had inferred
+// +0xDA0 / +0x10C0 (node + 8, as in 1.1.1.13) - 8 bytes off, which would have broken the climb.
+#define VEH_MATRIX_A       0xD98    // v1.2.0.9, seen live; was 0xD60 in 1.1.1.13
+#define VEH_MATRIX_B       0x10B8   // v1.2.0.9, seen live; was 0x1080 in 1.1.1.13
 #define VT_IDENT           0x200
 #define TYPE_STORAGE       5
 #define MAX_ROCKETS        16
