@@ -860,6 +860,46 @@ identically to Python for both goods modes (`race_6c98eb85`, `race_06f5fb56`), a
 - each window variant;
 - a shifted American notification.
 
+### Port to game version 1.1.1.13 (2026-11-24, built, verified offline)
+
+The game updated to 1.1.1.13 (`SOVIET64.exe` sha256 `4df5fbec...`, the build TesmioLoader 0.3.7
+ported to). Republic Mod Loader's Workshop item 3787969749 is gone; RML for 1.1.1.13 ships in the
+WRSR Ultimate Pack (3838038411, another modder's), now the Required Item and the collection's loader.
+
+- **Code moved, data did not.** `.data` globals (game object, scenario strings, resource and
+  vehicle-type vectors) and every structure offset checked are unchanged; functions moved by region.
+- `tools/port_scan.py` found every hook by its recorded prologue among `.pdata` function starts:
+  ScenarioEnumeration 0x5CB7C0 -> 0x5CB750, ResourceField 0x59B3F0 -> 0x59B380, CanUseBuilding
+  0x3E2900 -> 0x3E2840, TickAllBuildings unchanged; resources: ResourceGet 0x2AA7B0, price pass
+  0x2A92C0, customs tick 0x185500 - the same as TesmioLoader's own port.
+- Call-only helpers, from inside the new code: add-child 0x3BB8F0 -> 0x3BB830 (null-checks the
+  parent, then the parent's +0x5B8 list; called by the building loader and placement); the string
+  assign 0x8EB20 and the scenario globals 0x9E8648/68/88 unchanged (the new enumeration calls
+  0x8EB20 on 0x9E8648 and tests/clears 0x9E8688). Rocket bills: 0x3F8D10 -> 0x3F8C50 (still writes
+  vt+0x85C8).
+- Manifests: `supportedGameVersions` 1.1.1.13 and the observed-symbol names; `resources.ini`
+  `resource_rva`; the vendored resources plugin from TesmioLoader's 1.1.1.13 commit.
+- `tools/port_scan.py --verify`: 12/12 hook sites match their prologues. **Not yet run in game.**
+
+Superseded the same evening: Steam updated the game to **1.2.0.8** (PE stamp `0x6B0097B2`) at
+20:20, before this build was tested or published.
+
+### Port to game version 1.2.0.8 (2026-11-24, built, verified offline)
+
+A much larger update: code moved +0x14000..+0x27000, `.data` moved (every global), and structures
+changed (game object, building descriptor, vehicle, vehicle type, research and resource records).
+No 1.1.1.13 executable was kept, so every value was re-derived from the new code; TesmioLoader's
+own 1.2.0.8 port supplied the game object, its lists and the table strides. The full table and the
+evidence for each value are in the repo's AGENTS.md, section 6. `port_scan.py --verify`: 12/12.
+
+Found while trying the in-game smoke test (game started through the WRSR Ultimate Pack's launcher,
+which has no 1.2.0.8 release): the subscribed 1.1.1.9 tramdo hooked three wrong addresses, because
+every plugin's `LiveOrPristine` took *any* unexpected bytes for another plugin's hook; RML caught
+the integrity failure and discarded the session. Fixed in all plugins: chain only onto a
+recognisable jump, otherwise refuse. Minutes later Windows Defender quarantined the pack's
+`RepublicModLoader.exe` (Behavior:Win32/DefenseEvasion.A!ml), and the PC was locked: the in-game
+pass is still open.
+
 ### Pending: showing the experts in game (done in the launch-sequence programme)
 
 Before it, cosmonauts showed only in `rml-runtime.log` ("N experts in the republic", "promoted") and as
@@ -893,3 +933,50 @@ code. Ship it with the next new game, and test whether a changed programme loads
    appear standing on the linked pad.
 7. Truck bays on the MIK, rocket plant, tracking station, LOX plant and
    instrument works are in open yard.
+
+## Game 1.2.0.9 (2026-11-25)
+
+Steam updated the game to 1.2.0.9 (a fixes patch after the official Space Program DLC) the
+morning after the 1.2.0.8 port, before that port had run in game. This time the previous
+executable had been kept (build/game_backup/1.2.0.8), so the port was a comparison, not a
+reconstruction: `tools/port_pair.py` (new) pairs the two builds' functions and maps every define.
+
+1.2.0.8 -> 1.2.0.9 (2026-11-25, `tools/port_pair.py`): both executables were at hand. Same section
+layout and the same 14,817 `.pdata` functions, so they pair by index (13,919 of the same size and
+instruction count). Code moved by -0x170..+0x2D0; the game object grew 8 bytes between +0xB650
+and +0xBCB8 (research, blocking, buildings, persons and vehicles +8; day/year, fuel mode and the
+research-off flag unchanged); some `.data` globals moved +8 (scenario strings, resource vector,
+vehicle and building type tables) while the game object, the particle pointer and the middle
+point did not; every other offset is unchanged (each counted over all paired instructions).
+Checked live: at the new offsets the research list holds 128 records of 0x138, the buildings
+list 35 and the persons list 104 in a new game; the old offsets read the neighbouring field.
+
+The 1.2.0.8 builds refused all their hooks on 1.2.0.9, as designed ("the bytes there are not the
+function this plugin was built for"). The 1.2.0.9 builds, in game (a new Flatland game, 1970,
+only our plugins enabled): every hook installed (spacerace 5/5, experts, resources, tramdo 3 with
+the set-length check recognised), RML committed cleanly, the 16 kit buildings were patched at
+load, the programme auto-started (`spacerace / race_6c98eb85`) and the game ran at speed with
+both TickAllBuildings hooks chained. Not exercised: launches, bills of parts, pad linking (no
+buildings of ours placed).
+
+The live research list also showed the official DLC's own branch (`space_rocket_fuel`,
+`space_sputnik`, `space_vostok`, `space_soyuz`, `space_proton_rocket`, `space_station`, ...). Its
+names do not collide with ours (`sr_*`), but the two programmes now overlap in theme.
+
+### The new goods meet the game's own (2026-11-25)
+
+The live resource table holds 61 records, among them `udmh`, `n2o4`, `lox` and `kerosene` - the
+base game's goods for its Space Program DLC (in the table with or without the DLC). The script
+API changed with them: `SOVIETInstructions.txt` now names `kerosene` and `lox` where
+`_Resources_reserved_16_` and `_17_` were, and ResourceField answers `lox` with +0xF0. That breaks
+`new_goods = 1` since 1.2.0.8: our `lox` would duplicate the game's, the four `vm_goods` (lox,
+hypergolic, spacecraft, avionics -> +0xEC..+0xF8) would land in kerosene's and lox's fields, and
+the rendered programme would name `_Resources_reserved_16_`/`_17_`, which no longer exist. The
+1.2.0.8 port only checked addresses and missed it.
+
+Until the goods are reworked, both plugins treat `new_goods = 1` as 0 and log it. Stand-in mode
+(the default) is unaffected: StandIn() maps unconditionally (lox -> chemicals for loads and
+recipes), and the resources alias only answers names the game does not know, so the game's own
+`lox` is never redirected. The rework: use the game's `lox` (and `udmh` + `n2o4` for the
+hypergolic pair) instead of adding our own, keep at most two `vm_goods` (reserved 18 and 19), and
+adjust the `goods_buildings` variants and the rocket bills.

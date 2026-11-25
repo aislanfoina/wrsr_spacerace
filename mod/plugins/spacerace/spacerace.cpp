@@ -1,5 +1,8 @@
 // spacerace.cpp - the Space Race in any game: research branch, names, programme.
 //
+// Game build: 1.2.0.9 (ported 2026-11-25 from 1.2.0.8, which came via 1.1.1.13; tools/port_scan.py --verify checks the hook
+// addresses). Call-site addresses in these notes that the code never touches are the 1.1.1.9 ones.
+//
 // Four small jobs, all at start-up except the last:
 //
 //   1. Install data. spacerace_data\research\*.png go to media_soviet\research
@@ -8,7 +11,7 @@
 //      Only our own files are written; nothing of the game's is touched.
 //
 //   2. Research branch. SOVIET64 reads research\research.ini with fopen after
-//      C3DPath_GetFullPath (0x2F3D12). A merged copy - the vanilla file, plus an
+//      C3DPath_GetFullPath (0x2F3D12 in 1.1.1.9). A merged copy - the vanilla file, plus an
 //      $UNLOCK_RESEARCH line in the vanilla parents named by inject.ini, plus our
 //      research_space.ini with {KIT} replaced by the building kit's item id - is
 //      written beside the DLL, and SOVIET64's fopen import is swapped so that one
@@ -20,9 +23,9 @@
 //      spacerace_data\strings.txt, passing every other id through.
 //
 //   4. The programme. On every world load the game parses stats.ini (setting the
-//      scenario/mission std::strings at 0x9E8648 / 0x9E8668 and the auto-start
-//      flag at 0x9E8688 for $ScenarioAutoStart) and then enumerates scenarios
-//      (0x5CB7C0, one caller). A hook there sees an empty scenario - an ordinary
+//      scenario/mission std::strings at RVA_SCEN_NAME / RVA_SCEN_MISSION and the auto-start
+//      flag at RVA_SCEN_AUTOSTART for $ScenarioAutoStart) and then enumerates scenarios
+//      (RVA_SCEN_ENUM, one caller). A hook there sees an empty scenario - an ordinary
 //      game - and sets spacerace/programme with the auto-start flag, exactly what
 //      a map's "$ScenarioAutoStart spacerace programme" would do. Campaigns,
 //      tutorials, Year Zero and saves already running a scenario are left alone.
@@ -30,9 +33,9 @@
 //
 //   5. Pads to the MIK. The MIK is an aircraft production line; a finished
 //      aircraft goes to a free station of a building linked to the line
-//      (0x1CA97D), and the rocket list only opens once one is linked. A link is
+//      (0x1CA97D in 1.1.1.9), and the rocket list only opens once one is linked. A link is
 //      the child's parent pointer (building+0x5B0) plus the parent's child list
-//      (+0x5B8, added by 0x3BB8F0(game, parent, child), as the game does when it
+//      (+0x5B8, added by RVA_ADD_CHILD(game, parent, child), as the game does when it
 //      creates or loads a linked building; saves keep it). The game's own way to
 //      make one at placement did not take for our pads, so a post-hook on
 //      TickAllBuildings links every unlinked launch pad (object sr_pad_*) to the
@@ -42,7 +45,7 @@
 //      spacerace.ini (the player's copy, same syntax) set the balance:
 //      - [research] years and costs, applied while the merged research.ini is built;
 //      - [building:<object>] costs, staff and production. The building-type loader
-//        opens every building.ini with the same fopen import (0x10E37E), so a kit
+//        opens every building.ini with the same fopen import (0x10E37E in 1.1.1.9), so a kit
 //        building's file is served as a patched copy in spacerace_data\buildings;
 //      - [rocket_parts] the MIK bills;
 //      - the programme: data\programme\race.tmpl has @tokens@ for [america],
@@ -64,24 +67,24 @@
 
 static const TsmHost* H;
 
-#define RVA_SCEN_ENUM      0x5CB7C0
-#define RVA_STR_ASSIGN     0x8EB20
-#define RVA_SCEN_NAME      0x9E8648
-#define RVA_SCEN_MISSION   0x9E8668
-#define RVA_SCEN_AUTOSTART 0x9E8688
+#define RVA_SCEN_ENUM      0x5F3290 // v1.2.0.9; was 0x5F2FC0 in 1.2.0.8, 0x5CB750 in 1.1.1.13
+#define RVA_STR_ASSIGN     0xA6880 // v1.2.0.9; was 0xA69F0 in 1.2.0.8, 0x8EB20 in 1.1.1.13
+#define RVA_SCEN_NAME      0xA32710 // v1.2.0.9; was 0xA32708 in 1.2.0.8, 0x9E8648 in 1.1.1.13
+#define RVA_SCEN_MISSION   0xA32730 // v1.2.0.9; was 0xA32728 in 1.2.0.8, 0x9E8668 in 1.1.1.13
+#define RVA_SCEN_AUTOSTART 0xA32750 // v1.2.0.9; was 0xA32748 in 1.2.0.8, 0x9E8688 in 1.1.1.13
 #define STRING_ID_MIN      591000
 #define STRING_ID_MAX      591999
 
 static const unsigned char kEnumPro[18] = { 0x40, 0x55, 0x41, 0x54, 0x41, 0x55, 0x41, 0x56, 0x41, 0x57,
                                             0x48, 0x8D, 0xAC, 0x24, 0x90, 0xDE, 0xFF, 0xFF };
 
-#define RVA_TICK_ALL       0x139A70
-#define RVA_ADD_CHILD      0x3BB8F0
-#define CTX_BUILDINGS      0x11B08
+#define RVA_TICK_ALL       0x1523B0 // v1.2.0.9; was 0x152520 in 1.2.0.8, 0x139A70 in 1.1.1.13
+#define RVA_ADD_CHILD      0x3DA950 // v1.2.0.9; was 0x3DA6A0 in 1.2.0.8, 0x3BB830 in 1.1.1.13
+#define CTX_BUILDINGS      0x11BB8 // v1.2.0.9; was 0x11BB0 in 1.2.0.8, 0x11B08 in 1.1.1.13
 #define BLD_TYPEDESC       0x318
 #define BLD_NODE           0x320
 #define BLD_PARENT         0x5B0
-#define TD_TYPE            0x360
+#define TD_TYPE            0x368 // v1.2.0.8; was 0x360 in 1.1.1.13
 #define TYPE_PRODUCTION    0x28
 #define TYPE_AIR_PARKING   0x2F
 
@@ -861,6 +864,17 @@ static void LoadConfig(void)
     g_research  = GetI("general", "research", g_research);
     g_test      = GetI("general", "test_mode", g_test);
     g_newGoods  = GetI("general", "new_goods", 0) != 0;
+    // Since game 1.2.0.8 the base game has goods of its own for the space programme (lox, udmh,
+    // n2o4, kerosene), and the script struct's spare fields 16 and 17 became `kerosene` and `lox`:
+    // the added goods would collide with the game's lox, land in kerosene's field and leave the
+    // rendered programme naming fields that no longer exist. Until they are redesigned around the
+    // game's own goods, new_goods = 1 falls back to the stand-ins (the resources plugin does too).
+    if (g_newGoods)
+    {
+        LogLine("spacerace  new_goods = 1 is not available on this game version (it has its own lox and "
+                "kerosene where the added goods went) - using the vanilla stand-ins");
+        g_newGoods = 0;
+    }
     float f = GetF("general", "test_cost", g_testCost);  if (f > 0.0f) g_testCost = f;
     f = GetF("general", "link_range", g_linkRange);     if (f > 0.0f) g_linkRange = f;
 }
@@ -961,9 +975,15 @@ static void LinkPads(unsigned char* ctx)
 // is over the flag is cleared again; the script sees vehi.bDisableSell drop and
 // removes the rocket (a failure removes it after a few seconds instead).
 
-#define CTX_VEHICLES       0x12810
-#define VEH_TYPE           0x1708
+#define CTX_VEHICLES       0x128C8 // v1.2.0.9; was 0x128C0 in 1.2.0.8, 0x12810 in 1.1.1.13
+#define VEH_TYPE           0x1748 // v1.2.0.8; was 0x1708 in 1.1.1.13
 #define VEH_NOSELL         0x38A
+// the vehicle's two world matrices (each followed by its inverse, then a position copy at +0x80).
+// Read from a live 1.2.0.9 game (2026-11-25, trams in a save): the orthonormal rows start at +0xD98
+// and +0x10B8, translation at +0x30, copy at +0xE18 / +0x1138. The 1.2.0.8 port had inferred
+// +0xDA0 / +0x10C0 (node + 8, as in 1.1.1.13) - 8 bytes off, which would have broken the climb.
+#define VEH_MATRIX_A       0xD98    // v1.2.0.9, seen live; was 0xD60 in 1.1.1.13
+#define VEH_MATRIX_B       0x10B8   // v1.2.0.9, seen live; was 0x1080 in 1.1.1.13
 #define VT_IDENT           0x200
 #define TYPE_STORAGE       5
 #define MAX_ROCKETS        16
@@ -982,7 +1002,7 @@ static int   g_nrocket;
 static GoodT g_legacyLoad[MAX_ROCKETS][MAX_GOODS];   // launches.ini's loads, for legacy missions
 static int   g_legacyNload[MAX_ROCKETS];
 static float g_legacyRadius = 450.0f;
-// added goods scripts may read: the name -> Resources-field chain (SOVIET64 0x59B3F0) knows only the
+// added goods scripts may read: the name -> Resources-field chain (RVA_RES_FIELD) knows only the
 // base game's names, so these are answered with the spare fields _Resources_reserved_16_.._19_
 static char  g_vmGoods[4][32];
 static int   g_nvm;
@@ -1002,16 +1022,20 @@ static int    g_nlaunch;
 static ULONGLONG g_lastTickMs;
 
 // Particles: the engine's effect library (particleeffects.ini) hangs off the global C3D
-// object at SOVIET64 RVA 0x9941F0, +0xF60. Effects are looked up by name and emitted
+// object at RVA_ENGINE_PTR, +ENG_PARTICLES. Effects are looked up by name and emitted
 // with C3D_PARTICLEFFECT::SpawnParticles(pos, dir, 1, 1.0, 1.0, 0) - the game's own
-// calls (vehicle dust 0x16CB6B, weather 0xEB87). Vehicles only emit their
+// calls (vehicle dust 0x16CB6B, weather 0xEB87 in 1.1.1.9). Vehicles only emit their
 // $PARTICLE_MOVEMENT while the game moves them, so a launch spawns its own.
-#define RVA_ENGINE_PTR     0x9941F0
-#define ENG_PARTICLES      0xF60
+#define RVA_ENGINE_PTR     0x9DDC88 // v1.2.0.8; was 0x9941F0 in 1.1.1.13
+#define ENG_PARTICLES      0x1000 // v1.2.0.8; was 0xF60 in 1.1.1.13
 typedef void* (*GetEffectFn)(void* lib, char* name);
 typedef void  (*SpawnFn)(void* effect, const float* pos, const float* dir, char a, float b, float c, char d);
+// Since game 1.2.0.8 SpawnParticles takes one more float (`...0_NMM1M@Z`); every one of the game's
+// own calls passes it the same value as the two floats before it, 1.0.
+typedef void  (*Spawn7Fn)(void* effect, const float* pos, const float* dir, char a, float b, float c, char d, float e);
 static GetEffectFn g_getEffect;
 static SpawnFn     g_spawn;
+static Spawn7Fn    g_spawn7;
 static char g_fxFlame[32] = "airplane_jet";      // under the rocket, every tick of the climb
 static char g_fxSmoke[32] = "big_firesmoke";     // the trail
 static char g_fxPad[32]   = "factory_big_white"; // steam and dust round the pad as it lifts off
@@ -1023,7 +1047,7 @@ static int g_nafter;
 
 static void Fx(char* name, float x, float y, float z, float dy)
 {
-    if (!g_getEffect || !g_spawn || !name[0]) return;
+    if (!g_getEffect || (!g_spawn && !g_spawn7) || !name[0]) return;
     unsigned char* eng = *(unsigned char**)(H->exeBase + RVA_ENGINE_PTR);
     if (!LooksLikePointer(eng) || !Readable(eng + ENG_PARTICLES, 8)) return;
     void* lib = *(void**)(eng + ENG_PARTICLES);
@@ -1031,7 +1055,8 @@ static void Fx(char* name, float x, float y, float z, float dy)
     void* fx = g_getEffect(lib, name);
     if (!fx) return;
     float pos[3] = { x, y, z }, dir[3] = { 0.0f, dy, 0.0f };
-    g_spawn(fx, pos, dir, 1, 1.0f, 1.0f, 0);
+    if (g_spawn7) g_spawn7(fx, pos, dir, 1, 1.0f, 1.0f, 0, 1.0f);
+    else          g_spawn(fx, pos, dir, 1, 1.0f, 1.0f, 0);
 }
 
 // a rocket's launch load, goods named as the settings name them, taken as the current goods
@@ -1540,7 +1565,7 @@ static void TakeLoad(unsigned char* ctx, float x, float z, const RocketLoad* r, 
 
 static void Place(Launch* L, float h)
 {
-    static const int kMat[2] = { 0xD60, 0x1080 }, kCopy[2] = { 0xDE0, 0x1100 };
+    static const int kMat[2] = { VEH_MATRIX_A, VEH_MATRIX_B }, kCopy[2] = { VEH_MATRIX_A + 0x80, VEH_MATRIX_B + 0x80 };
     for (int m = 0; m < 2; ++m)
     {
         float t[3] = { L->base[m][0], L->base[m][1] + h, L->base[m][2] };
@@ -1622,14 +1647,14 @@ static void Launches(unsigned char* ctx, int scan)
         unsigned char* v = begin[k];
         if (!LooksLikePointer(v) || !Readable(v + VEH_NOSELL, 1) || !*(v + VEH_NOSELL)) continue;
         const RocketLoad* r = RocketOf(v);
-        if (!r || !Readable(v + 0xD60, 0x3C0)) continue;
+        if (!r || !Readable(v + VEH_MATRIX_A, 0x3C0)) continue;
         int known = 0;
         for (int i = 0; i < g_nlaunch && !known; ++i) known = (g_launch[i].v == v);
         if (known) continue;
         Launch* L = &g_launch[g_nlaunch++];
         memset(L, 0, sizeof *L);
         L->v = v;
-        static const int kMat[2] = { 0xD60, 0x1080 };
+        static const int kMat[2] = { VEH_MATRIX_A, VEH_MATRIX_B };
         for (int m = 0; m < 2; ++m)
         {
             const float* W = (const float*)(v + kMat[m]);
@@ -1652,10 +1677,10 @@ static void Launches(unsigned char* ctx, int scan)
 const RocketLoad* RocketType(unsigned char* vt);
 
 // Scripts read goods through Resources.GetFromBuilding and friends, which place each good by
-// asking SOVIET64 0x59B3F0(vm, name) for its byte offset in the Resources struct: a chain of
+// asking RVA_RES_FIELD(vm, name) for its byte offset in the Resources struct: a chain of
 // compares against the base game's names that answers 0 (the `workers` field!) for anything else.
 // The configured vm_goods get the four spare floats after service_material (0xE8) instead.
-#define RVA_RES_FIELD      0x59B3F0
+#define RVA_RES_FIELD      0x5C19B0 // v1.2.0.9; was 0x5C16E0 in 1.2.0.8, 0x59B380 in 1.1.1.13
 static const unsigned char kResFieldPro[15] = { 0x48, 0x89, 0x5C, 0x24, 0x08, 0x57, 0x48, 0x83, 0xEC, 0x20, 0x33, 0xDB,
                                                 0x48, 0x8B, 0xFA };
 typedef int (*ResFieldFn)(void* vm, const char* name);
@@ -1674,16 +1699,16 @@ static int DetourResField(void* vm, const char* name)
 }
 
 // A rocket's bill of parts. The engine computes every vehicle's bill from its empty weight in
-// fixed vanilla goods (0x3F8D10: workers, steel, aluminium, plastics, ...) into a vector at
+// fixed vanilla goods (0x3F8D10 in 1.1.1.9: workers, steel, aluminium, plastics, ...) into a vector at
 // vehicle type +0x85C8 of { Resource*, float tonnes, pad } - there is no script token for it.
 // For each rocket with a `bill` line the vector is rewritten in place: the workers entry stays,
 // the rest become the bill's goods (never more entries than it had). Checked every couple of
 // seconds, so a type the engine rebuilds is rewritten again.
-#define RVA_RES_VECTOR     0x9E11C0
-#define RES_STRIDE_BYTES   832
-#define RVA_VEH_TYPES      0x9E7750
-#define VT_STRIDE          0x9F08
-#define VT_BILL            0x85C8
+#define RVA_RES_VECTOR     0xA2B270 // v1.2.0.9; was 0xA2B268 in 1.2.0.8, 0x9E11C0 in 1.1.1.13
+#define RES_STRIDE_BYTES   896      // v1.2.0.8; was 832 in 1.1.1.13 (61 vanilla records now)
+#define RVA_VEH_TYPES      0xA31818 // v1.2.0.9; was 0xA31810 in 1.2.0.8, 0x9E7750 in 1.1.1.13
+#define VT_STRIDE          0xA0C8 // v1.2.0.8; was 0x9F08 in 1.1.1.13
+#define VT_BILL            0x8618 // v1.2.0.8; was 0x85C8 in 1.1.1.13
 
 static unsigned char* ResourceByName(const char* name)
 {
@@ -1746,12 +1771,12 @@ static void RewriteBills(void)
     g_billsDone = done;
 }
 
-// Which vehicle may use which pad. SOVIET64 0x3E2900(game, building, vehicle type, flag, x)
+// Which vehicle may use which pad. RVA_CAN_USE(game, building, vehicle type, flag, x)
 // answers "may this vehicle type use this building" for the purchase list, assignments and a
 // production line choosing where a finished vehicle goes (0x1CA9FB). Launch pads take only the
 // rockets launches.ini gives them (the N1 its heavy complex, the others the R-7 pad); the
 // recovery field takes no rockets. Everything else is the game's own answer.
-#define RVA_CAN_USE        0x3E2900
+#define RVA_CAN_USE        0x401C70 // v1.2.0.9; was 0x4019C0 in 1.2.0.8, 0x3E2840 in 1.1.1.13
 static const unsigned char kCanUsePro[23] = { 0x48, 0x89, 0x5C, 0x24, 0x10, 0x48, 0x89, 0x6C, 0x24, 0x18, 0x44, 0x88,
                                               0x4C, 0x24, 0x20, 0x56, 0x57, 0x41, 0x54, 0x41, 0x55, 0x41, 0x56 };
 typedef char (*CanUseFn)(void* ctx, unsigned char* bld, unsigned char* vt, char flag, void* extra);
@@ -1807,11 +1832,22 @@ static void DetourTick(void* ctx)
 
 static const unsigned char* LiveOrPristine(const unsigned char* target, const unsigned char* pristine, size_t len, unsigned char* buf, const char* label)
 {
-    if (!H->readablePtr(target, len)) return pristine;
+    // The expected prologue: hook it. Another plugin's hook - an absolute jump (FF 25 00000000
+    // <addr>), a relative jump (E9 rel32) or mov rax/r11, imm64 + jmp reg - chain onto it.
+    // Anything else is not the function this plugin was built for (a different game version):
+    // refuse, rather than hook unknown code. NULL = do not hook.
+    if (!H->readablePtr(target, len < 14 ? 14 : len)) return NULL;
     if (memcmp(target, pristine, len) == 0) return pristine;
-    memcpy(buf, target, len);
-    LogLine("%s: target already patched by another plugin, chaining onto the live bytes", label);
-    return buf;
+    if ((target[0] == 0xFF && target[1] == 0x25) || target[0] == 0xE9 ||
+        (target[0] == 0x48 && target[1] == 0xB8 && target[10] == 0xFF && target[11] == 0xE0) ||
+        (target[0] == 0x49 && target[1] == 0xBB && target[10] == 0x41 && target[11] == 0xFF && target[12] == 0xE3))
+    {
+        memcpy(buf, target, len);
+        LogLine("%s: another plugin's hook is there, chaining onto it", label);
+        return buf;
+    }
+    LogLine("%s: the bytes there are not the function this plugin was built for (another game version?) - not hooked", label);
+    return NULL;
 }
 
 extern "C" __declspec(dllexport) unsigned TsmPluginApiVersion(void) { return TSM_API_VERSION; }
@@ -1844,7 +1880,7 @@ extern "C" __declspec(dllexport) int TsmPluginStart(void)
         LogLine("spacerace  could not swap the GetString import - research names will be missing");
     unsigned char live[18];
     const unsigned char* expect = LiveOrPristine(H->exeBase + RVA_SCEN_ENUM, kEnumPro, 18, live, "spacerace ScenarioEnumeration");
-    if (H->installInlineHook(H->exeBase + RVA_SCEN_ENUM, (void*)&DetourEnum, (void**)&g_origEnum, expect, 18, "spacerace ScenarioEnumeration"))
+    if (expect && H->installInlineHook(H->exeBase + RVA_SCEN_ENUM, (void*)&DetourEnum, (void**)&g_origEnum, expect, 18, "spacerace ScenarioEnumeration"))
         ++hooks;
     else
         LogLine("spacerace  scenario enumeration 0x%X did not match - the programme will not start itself", RVA_SCEN_ENUM);
@@ -1853,7 +1889,9 @@ extern "C" __declspec(dllexport) int TsmPluginStart(void)
     if (c3d)
     {
         g_getEffect = (GetEffectFn)GetProcAddress(c3d, "?GetEffect@C3D_PARTICLEFFECT_LIBRARY@@QEAAPEAVC3D_PARTICLEFFECT@@PEAD@Z");
-        g_spawn     = (SpawnFn)GetProcAddress(c3d, "?SpawnParticles@C3D_PARTICLEFFECT@@QEAAXVC3DVECTOR3@@0_NMM1@Z");
+        g_spawn7    = (Spawn7Fn)GetProcAddress(c3d, "?SpawnParticles@C3D_PARTICLEFFECT@@QEAAXVC3DVECTOR3@@0_NMM1M@Z");
+        if (!g_spawn7)
+            g_spawn = (SpawnFn)GetProcAddress(c3d, "?SpawnParticles@C3D_PARTICLEFFECT@@QEAAXVC3DVECTOR3@@0_NMM1@Z");
     }
     // other RML plugins (helicopter distribution office, rolling stock road transport) hook this
     // too, with a 14-byte absolute jump (FF 25 00000000 <address>): chain on exactly that jump
@@ -1861,7 +1899,7 @@ extern "C" __declspec(dllexport) int TsmPluginStart(void)
     {
         unsigned char liveRes[15];
         const unsigned char* expectRes = LiveOrPristine(H->exeBase + RVA_RES_FIELD, kResFieldPro, 15, liveRes, "spacerace ResourceField");
-        if (H->installInlineHook(H->exeBase + RVA_RES_FIELD, (void*)&DetourResField, (void**)&g_origResField, expectRes, 15, "spacerace ResourceField"))
+        if (expectRes && H->installInlineHook(H->exeBase + RVA_RES_FIELD, (void*)&DetourResField, (void**)&g_origResField, expectRes, 15, "spacerace ResourceField"))
             ++hooks;
         else
             LogLine("spacerace  script goods not hooked - the programme cannot see %s and the rest", g_vmGoods[0]);
@@ -1879,19 +1917,19 @@ extern "C" __declspec(dllexport) int TsmPluginStart(void)
     }
     else
         expectCan = LiveOrPristine(tCan, kCanUsePro, 23, liveCan, "spacerace CanUseBuilding");
-    if (g_nrocket && H->installInlineHook(tCan, (void*)&DetourCanUse, (void**)&g_origCanUse, expectCan, lenCan, "spacerace CanUseBuilding"))
+    if (g_nrocket && expectCan && H->installInlineHook(tCan, (void*)&DetourCanUse, (void**)&g_origCanUse, expectCan, lenCan, "spacerace CanUseBuilding"))
         ++hooks;
     else
         LogLine("spacerace  vehicle-building check not hooked - any rocket can use any pad");
     unsigned char liveTick[19];
     const unsigned char* expectTick = LiveOrPristine(H->exeBase + RVA_TICK_ALL, kTickPro, 19, liveTick, "spacerace TickAllBuildings");
-    if (g_getPos && H->installInlineHook(H->exeBase + RVA_TICK_ALL, (void*)&DetourTick, (void**)&g_origTick, expectTick, 19, "spacerace TickAllBuildings"))
+    if (g_getPos && expectTick && H->installInlineHook(H->exeBase + RVA_TICK_ALL, (void*)&DetourTick, (void**)&g_origTick, expectTick, 19, "spacerace TickAllBuildings"))
         ++hooks;
     else
         LogLine("spacerace  TickAllBuildings hook not installed - launch pads will not be linked to the MIK");
     LogLine("spacerace  active: %d/%d hooks, %s goods, %d strings, autostart %s, pads link to a MIK within %.0f m, launch effects %s",
             hooks, (g_newGoods && g_nvm) ? 6 : 5, g_newGoods ? "new" : "stand-in", g_nstr, g_autostart ? "on" : "off", g_linkRange,
-            (g_getEffect && g_spawn) ? "on" : "OFF (exports not found)");
+            (g_getEffect && (g_spawn || g_spawn7)) ? "on" : "OFF (exports not found)");
     return 0;
 }
 

@@ -32,7 +32,7 @@ of time if the cement works cooperate.
 
 **On the Steam Workshop:** [Space Race: the complete programme](https://steamcommunity.com/sharedfiles/filedetails/?id=3814187744).
 Press *Subscribe to all* and the Ministry delivers the plugins, the kit, all five rockets and
-Republic Mod Loader.
+Republic Mod Loader (the WRSR Ultimate Pack). Game version **1.2.0.9** (November 2026).
 
 > **Status: under construction, like most of the republic.** Every feature below has run
 > in the game, but nobody has played the full race yet. Testers who would like to reach the
@@ -62,6 +62,8 @@ Republic Mod Loader.
   ![R-7 Sputnik, Vostok-K, Soyuz, Proton and the N1, with a comrade for scale](docs/images/rockets.jpg)
 - **Six new goods, if the republic wants them,** each with its own industry chain: rocket
   stages, rocket engines, avionics, liquid oxygen, hypergolic propellant and spacecraft.
+  *Not available on game 1.2.0.8 and later* (the game now has its own liquid oxygen and
+  rocket fuels): the switch falls back to the stand-ins until the goods are reworked.
   The truck drivers have been briefed and sworn to secrecy. They are off unless you switch
   them on (see *Saves*), and the programme then runs on the goods your republic already
   trades in: chemicals for the oxygen, mechanical components for the rocket parts,
@@ -199,17 +201,19 @@ Cosmonaut training (how long, how many, who) is in `mod/plugins/experts/experts.
 
 ## REQUIREMENTS
 
-- Workers & Resources: Soviet Republic **1.1.1.9**. The plugins patch this exact build and
+- Workers & Resources: Soviet Republic **1.2.0.9**. The plugins patch this exact build and
   will not recognise any other.
-- [Republic Mod Loader](https://steamcommunity.com/sharedfiles/filedetails/?id=3787969749)
-  (RML), which hosts the plugins.
+- Republic Mod Loader (RML) for that build, which hosts the plugins. It ships in the
+  [WRSR Ultimate Pack](https://steamcommunity.com/sharedfiles/filedetails/?id=3838038411),
+  another modder's item: a standard RML launcher plus plugins you can switch off.
 - To build: Windows, Visual Studio Build Tools (MSVC x64, Windows 10/11 SDK) and PowerShell.
 - To regenerate the models, textures and scripts: Python 3 with `numpy` and `pillow`,
   and Blender 5.2 (`tools/build_space.py`). Only the reverse-engineering helpers in
   `tools/` need `capstone`.
 
 **Saves:** out of the box (`new_goods = 0` in `spacerace.ini`) the mod adds no goods, and
-your existing republic can join the race as it is. The six new goods (`new_goods = 1`) can
+your existing republic can join the race as it is. (On game 1.2.0.8 and later the plugins
+treat `new_goods = 1` as 0, see above; a save that holds the six goods still loads.) The six new goods (`new_goods = 1`) can
 be switched on for an existing republic too: load it and they join the economy. Switching
 them off again is allowed: whatever is in stock is requisitioned as its stand-in (chemicals,
 mechanical components, electronics) and the next save is a plain one. Save once after each
@@ -233,7 +237,7 @@ Steam ids:
 
 | Item | What |
 |---|---|
-| [3814051864](https://steamcommunity.com/sharedfiles/filedetails/?id=3814051864) | *Space Race [1.1.1.9]*: the `spacerace`, `experts` and `resources` plugins |
+| [3814051864](https://steamcommunity.com/sharedfiles/filedetails/?id=3814051864) | *Space Race [1.2.0.9]*: the `spacerace`, `experts` and `resources` plugins |
 | [3814049784](https://steamcommunity.com/sharedfiles/filedetails/?id=3814049784) | *Space Race Kit*: the 16 buildings |
 | [3814050253](https://steamcommunity.com/sharedfiles/filedetails/?id=3814050253) | *R-7 Sputnik* |
 | [3814050457](https://steamcommunity.com/sharedfiles/filedetails/?id=3814050457) | *Vostok-K* |
