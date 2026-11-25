@@ -34,8 +34,32 @@ rep('#include "../../src/tesmio_plugin.h"', '#include "../../../vendor/TesmioLoa
 rep('static int    g_resHook = 1;', 'static int    g_resHook = 2;')
 rep('static int        g_priceReport = 1;', 'static int        g_priceReport = 0;')
 rep('static int   g_customsHook    = 1;', 'static int   g_customsHook    = 0;')
-rep('''    _snprintf_s(path, sizeof(path), _TRUNCATE, "%s\\\\plugins\\\\resources.ini", g_baseDir);''',
+# upstream reads <pluginDir>\resources.ini since its 1.2.0.8 release; under RML the file sits in baseDir
+rep('''    _snprintf_s(path, sizeof(path), _TRUNCATE, "%s\\\\resources.ini", H->pluginDir);''',
     '''    _snprintf_s(path, sizeof(path), _TRUNCATE, "%s\\\\resources.ini", g_baseDir);''')
+
+# Game 1.2.0.9 (2026-11-25). The vendored upstream (TesmioLoader aafbe87c, v0.4.5) is built for
+# 1.2.0.8; until it ships 1.2.0.9 the addresses move here. Values from pairing the two builds'
+# .pdata functions by index (same count, same sizes) and their rip-relative references; the
+# resource record layout (stride 896, every field) is unchanged. The 1.2.0.8 values become the
+# "previous" ones, so a resources.ini still holding them is upgraded with a log line.
+rep('#define DEFAULT_RESOURCEGET_RVA 0x2C6230     // v1.2.0.8; was 0x2AA7B0',
+    '#define DEFAULT_RESOURCEGET_RVA 0x2C6380     // v1.2.0.9; was 0x2C6230 in 1.2.0.8, 0x2AA7B0 in 1.1.1.13')
+rep('#define DEFAULT_RESOURCE_VECTOR_RVA 0xA2B268  // v1.2.0.8; was 0x9E11C0',
+    '#define DEFAULT_RESOURCE_VECTOR_RVA 0xA2B270  // v1.2.0.9; was 0xA2B268 in 1.2.0.8, 0x9E11C0 in 1.1.1.13')
+rep('#define DEFAULT_PRICEPASS_RVA 0x2C4D40     // v1.2.0.8; was 0x2A92C0',
+    '#define DEFAULT_PRICEPASS_RVA 0x2C4E90     // v1.2.0.9; was 0x2C4D40 in 1.2.0.8, 0x2A92C0 in 1.1.1.13')
+rep('#define P_CUSTOMHOUSE_TICK_RVA 0x19E300    // v1.2.0.8; was 0x185500',
+    '#define P_CUSTOMHOUSE_TICK_RVA 0x19E190    // v1.2.0.9; was 0x19E300 in 1.2.0.8, 0x185500 in 1.1.1.13')
+rep('#define P_CUSTOMS_SLOT_PUSH_RVA 0xC9150     // v1.2.0.8; was 0xB14E0.',
+    '#define P_CUSTOMS_SLOT_PUSH_RVA 0xC8FE0     // v1.2.0.9; was 0xC9150 in 1.2.0.8, 0xB14E0 in 1.1.1.13.')
+rep('"resource_rva", DEFAULT_RESOURCEGET_RVA, 0x2AA7B0)', '"resource_rva", DEFAULT_RESOURCEGET_RVA, 0x2C6230)')
+rep('"resource_vector_rva", DEFAULT_RESOURCE_VECTOR_RVA, 0x9E11C0)', '"resource_vector_rva", DEFAULT_RESOURCE_VECTOR_RVA, 0xA2B268)')
+rep('"price_pass_rva", DEFAULT_PRICEPASS_RVA, 0x2A92C0)', '"price_pass_rva", DEFAULT_PRICEPASS_RVA, 0x2C4D40)')
+rep('"customhouse_tick_rva", P_CUSTOMHOUSE_TICK_RVA, 0x185500)', '"customhouse_tick_rva", P_CUSTOMHOUSE_TICK_RVA, 0x19E300)')
+rep('uses the v1.1.1.13 default 0x%X; using 0x%X', 'uses the 1.2.0.8 default 0x%X; using 0x%X')
+rep('//   rva 0xA2B268  the vector object', '//   rva 0xA2B270  the vector object')
+rep('found at SOVIET64+0xA2B268', 'found at SOVIET64+0xA2B270')
 
 # config readers against the file beside the DLL
 rep('''extern "C" __declspec(dllexport) unsigned TsmPluginApiVersion(void)''',
@@ -79,10 +103,15 @@ extern "C" __declspec(dllexport) int TsmPluginStart(void)
     // game's, and a save that still names them reads each as its stand-in
     char spacerace[MAX_PATH];
     _snprintf_s(spacerace, sizeof spacerace, _TRUNCATE, "%s\\\\spacerace.ini", g_selfDir);
-    bool aliasOnly = GetFileAttributesA(spacerace) != INVALID_FILE_ATTRIBUTES && GetPrivateProfileIntA("general", "new_goods", 0, spacerace) == 0;
+    bool aliasOnly = GetFileAttributesA(spacerace) != INVALID_FILE_ATTRIBUTES;
+    // game 1.2.0.8+ has its own lox (and kerosene in the script fields the added goods used): new_goods = 1
+    // is off until the goods are redesigned around them - the spacerace plugin falls back the same way
+    if (aliasOnly && GetPrivateProfileIntA("general", "new_goods", 0, spacerace) != 0)
+        Logf("resource  new_goods = 1 is not available on this game version (it has its own lox) - "
+             "adding nothing; the six names a save may hold are read as their stand-ins");
     if (aliasOnly && !LoadAliases(g_selfDir))
     {
-        Logf("resource  spacerace.ini new_goods = 0 - no mod resources, saves stay the base game's");
+        Logf("resource  stand-in goods - no mod resources, saves stay the base game's");
         return 0;
     }
 ''')
@@ -108,7 +137,7 @@ rep('''    if (!InstallInlineHook(g_exeBase + g_resRva, (void*)h_ResourceGet,
         return 1;
     if (aliasOnly)
     {
-        Logf("resource  spacerace.ini new_goods = 0 - no mod resources, saves stay the base game's; "
+        Logf("resource  stand-in goods - no mod resources, saves stay the base game's; "
              "%d new goods a save may still hold are read as their stand-ins", g_aliasCount);
         return 0;
     }
