@@ -32,7 +32,8 @@ of time if the cement works cooperate.
 
 **On the Steam Workshop:** [Space Race: the complete programme](https://steamcommunity.com/sharedfiles/filedetails/?id=3814187744).
 Press *Subscribe to all* and the Ministry delivers the plugins, the kit, all five rockets and
-Republic Mod Loader (the WRSR Ultimate Pack). Game version **1.1.1.13**.
+Republic Mod Loader (the WRSR Ultimate Pack). Game version **1.2.0.8**: the plugins are being
+updated for it (November 2026) and need a Republic Mod Loader that supports it.
 
 > **Status: under construction, like most of the republic.** Every feature below has run
 > in the game, but nobody has played the full race yet. Testers who would like to reach the
@@ -199,9 +200,9 @@ Cosmonaut training (how long, how many, who) is in `mod/plugins/experts/experts.
 
 ## REQUIREMENTS
 
-- Workers & Resources: Soviet Republic **1.1.1.13**. The plugins patch this exact build and
+- Workers & Resources: Soviet Republic **1.2.0.8**. The plugins patch this exact build and
   will not recognise any other.
-- Republic Mod Loader (RML), which hosts the plugins. For 1.1.1.13 it ships in the
+- Republic Mod Loader (RML) for that build, which hosts the plugins. It ships in the
   [WRSR Ultimate Pack](https://steamcommunity.com/sharedfiles/filedetails/?id=3838038411),
   another modder's item: a standard RML launcher plus plugins you can switch off.
 - To build: Windows, Visual Studio Build Tools (MSVC x64, Windows 10/11 SDK) and PowerShell.
@@ -234,7 +235,7 @@ Steam ids:
 
 | Item | What |
 |---|---|
-| [3814051864](https://steamcommunity.com/sharedfiles/filedetails/?id=3814051864) | *Space Race [1.1.1.13]*: the `spacerace`, `experts` and `resources` plugins |
+| [3814051864](https://steamcommunity.com/sharedfiles/filedetails/?id=3814051864) | *Space Race [1.2.0.8]*: the `spacerace`, `experts` and `resources` plugins |
 | [3814049784](https://steamcommunity.com/sharedfiles/filedetails/?id=3814049784) | *Space Race Kit*: the 16 buildings |
 | [3814050253](https://steamcommunity.com/sharedfiles/filedetails/?id=3814050253) | *R-7 Sputnik* |
 | [3814050457](https://steamcommunity.com/sharedfiles/filedetails/?id=3814050457) | *Vostok-K* |

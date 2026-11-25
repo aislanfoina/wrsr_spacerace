@@ -34,7 +34,8 @@ rep('#include "../../src/tesmio_plugin.h"', '#include "../../../vendor/TesmioLoa
 rep('static int    g_resHook = 1;', 'static int    g_resHook = 2;')
 rep('static int        g_priceReport = 1;', 'static int        g_priceReport = 0;')
 rep('static int   g_customsHook    = 1;', 'static int   g_customsHook    = 0;')
-rep('''    _snprintf_s(path, sizeof(path), _TRUNCATE, "%s\\\\plugins\\\\resources.ini", g_baseDir);''',
+# upstream reads <pluginDir>\resources.ini since its 1.2.0.8 release; under RML the file sits in baseDir
+rep('''    _snprintf_s(path, sizeof(path), _TRUNCATE, "%s\\\\resources.ini", H->pluginDir);''',
     '''    _snprintf_s(path, sizeof(path), _TRUNCATE, "%s\\\\resources.ini", g_baseDir);''')
 
 # config readers against the file beside the DLL

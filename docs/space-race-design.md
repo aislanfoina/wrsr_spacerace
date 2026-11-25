@@ -881,6 +881,25 @@ WRSR Ultimate Pack (3838038411, another modder's), now the Required Item and the
   `resource_rva`; the vendored resources plugin from TesmioLoader's 1.1.1.13 commit.
 - `tools/port_scan.py --verify`: 12/12 hook sites match their prologues. **Not yet run in game.**
 
+Superseded the same evening: Steam updated the game to **1.2.0.8** (PE stamp `0x6B0097B2`) at
+20:20, before this build was tested or published.
+
+### Port to game version 1.2.0.8 (2026-11-24, built, verified offline)
+
+A much larger update: code moved +0x14000..+0x27000, `.data` moved (every global), and structures
+changed (game object, building descriptor, vehicle, vehicle type, research and resource records).
+No 1.1.1.13 executable was kept, so every value was re-derived from the new code; TesmioLoader's
+own 1.2.0.8 port supplied the game object, its lists and the table strides. The full table and the
+evidence for each value are in the repo's AGENTS.md, section 6. `port_scan.py --verify`: 12/12.
+
+Found while trying the in-game smoke test (game started through the WRSR Ultimate Pack's launcher,
+which has no 1.2.0.8 release): the subscribed 1.1.1.9 tramdo hooked three wrong addresses, because
+every plugin's `LiveOrPristine` took *any* unexpected bytes for another plugin's hook; RML caught
+the integrity failure and discarded the session. Fixed in all plugins: chain only onto a
+recognisable jump, otherwise refuse. Minutes later Windows Defender quarantined the pack's
+`RepublicModLoader.exe` (Behavior:Win32/DefenseEvasion.A!ml), and the PC was locked: the in-game
+pass is still open.
+
 ### Pending: showing the experts in game (done in the launch-sequence programme)
 
 Before it, cosmonauts showed only in `rml-runtime.log` ("N experts in the republic", "promoted") and as

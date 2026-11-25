@@ -9,18 +9,20 @@ is the long design and test history (every address and every in-game test, dated
 
 ## 1. What this is
 
-A mod for **Workers & Resources: Soviet Republic 1.1.1.13** (`SOVIET64.exe`, image base
-0x140000000; every address below is an RVA valid for this build only - ported from 1.1.1.9 on
-2026-11-24, see section 6). It adds a Soviet space
+A mod for **Workers & Resources: Soviet Republic 1.2.0.8** (`SOVIET64.exe`, image base
+0x140000000; every address below is an RVA valid for this build only - ported from 1.1.1.9 via
+1.1.1.13 on 2026-11-24, see section 6; **not yet run in game on 1.2.0.8**). It adds a Soviet space
 programme to any ordinary game: a research branch, 16 buildings, 5 rockets, optional new goods, a
 fourth education tier (cosmonauts / chief designers), and a scenario ("the programme") that runs
 eight milestones against the real American timeline. The last milestone is an N1 Moon landing
 before Apollo 11 (20 July 1969).
 
-Runs on **Republic Mod Loader (RML)**, which hosts TesmioLoader-API plugins (API 3/4). For
-1.1.1.13 RML ships in the **WRSR Ultimate Pack** (Workshop 3838038411, by another modder: a
-standard RML launcher plus 16 Ultimate-Universe plugins); the original RML item 3787969749 is
-gone from Steam. Three plugins (all C++, MSVC x64, /MT): `spacerace`, `experts`, `resources`.
+Runs on **Republic Mod Loader (RML)**, which hosts TesmioLoader-API plugins (API 3/4). RML
+now ships in the **WRSR Ultimate Pack** (Workshop 3838038411, by another modder: a standard RML
+launcher plus 16 Ultimate-Universe plugins; built for 1.1.1.13 - on 2026-11-24 it had no 1.2.0.8
+release and Windows Defender quarantined its launcher as Behavior:Win32/DefenseEvasion.A!ml);
+the original RML item 3787969749 is gone from Steam. Its launcher rewrites `rml/config.json`'s live
+lists from the `default*` ones of the selected playlist: set both when editing by hand. Three plugins (all C++, MSVC x64, /MT): `spacerace`, `experts`, `resources`.
 
 Status (2026-10-05): every feature has run in the game; the full race has not been played through.
 `spacerace.ini` ships with `test_mode = 0` (1 = space research at 5 % cost, no year limits, for
@@ -101,10 +103,10 @@ Hooks (installed in `TsmPluginStart`):
 |---|---|---|
 | IAT `api-ms-win-crt-stdio-l1-1-0.dll!fopen` | SOVIET64 import | serves a merged `research/research.ini` (vanilla + our branch) and patched kit `building.ini` files |
 | IAT `C3DDLL64.dll!?GetString@C3D_LANGUAGE@@QEAAPEA_WH@Z` | | answers our string ids 591000-591999 from `strings.txt` |
-| inline ScenarioEnumeration `0x5CB750` (18-byte prologue) | | auto-starts the programme in an ordinary game; then applies the running mission's launch rules |
-| inline TickAllBuildings `0x139A70` (post) | | pad linking, launches, rocket bills (other plugins hook it too: chain on the live bytes) |
-| inline ResourceField `0x59B380` | only with new goods | maps `vm_goods` names to the spare Resources fields so scripts can read added goods |
-| inline CanUseBuilding `0x3E2840` | | pad rule: each rocket only on its pad kind; chained after another plugin's 14-byte `FF 25 00000000 <addr>` jump |
+| inline ScenarioEnumeration `0x5F2FC0` (18-byte prologue) | | auto-starts the programme in an ordinary game; then applies the running mission's launch rules |
+| inline TickAllBuildings `0x152520` (post) | | pad linking, launches, rocket bills (other plugins hook it too: chain on the live bytes) |
+| inline ResourceField `0x5C16E0` | only with new goods | maps `vm_goods` names to the spare Resources fields so scripts can read added goods |
+| inline CanUseBuilding `0x4019C0` | | pad rule: each rocket only on its pad kind; chained after another plugin's 14-byte `FF 25 00000000 <addr>` jump |
 
 Jobs:
 1. **Install data** into `media_soviet` (research icons, scenario folders, goods icons).
@@ -114,11 +116,11 @@ Jobs:
    and scales costs.
 3. **Names** for ids 591000+.
 4. **Programme auto-start:** in the enumeration hook, an empty scenario string (an ordinary game)
-   gets `spacerace / <mission>` + auto-start flag (std::strings at 0x9E8648 scenario, 0x9E8668
-   mission, flag byte 0x9E8688; assign helper 0x8EB20(this, ptr, len)) - what a map's
+   gets `spacerace / <mission>` + auto-start flag (std::strings at 0xA32708 scenario, 0xA32728
+   mission, flag byte 0xA32748; assign helper 0xA69F0(this, ptr, len)) - what a map's
    `$ScenarioAutoStart` does. Saves already running a scenario are left alone.
 5. **Pads to the MIK:** unlinked `sr_pad_*` get the nearest `sr_mik` within `link_range` (pad+0x5B0
-   = MIK, then 0x3BB830(game, MIK, pad)); the game's own placement linking did not work for them.
+   = MIK, then 0x3DA6A0(game, MIK, pad)); the game's own placement linking did not work for them.
 6. **Settings** (see section 7): building files patched at load, the programme rendered from a
    template into `race_<fnv hash>`, `rules.ini` per mission read on every world load.
 7. **Launches:** the script flags the rocket with `Vehicle_SetCanSell(veh, 0)` (byte vehicle+0x38A,
@@ -127,7 +129,7 @@ Jobs:
    `1.2 s^2 + 0.25 s^3`), spawns flame/smoke/pad steam particles, then clears the flag; the script
    sells the rocket. A rocket removed mid-climb (failure) gets an explosion and 8 s of smoke.
 8. **Rocket bills:** each rocket type's bill of parts (type+0x85C8, 16-byte {Resource*, float}
-   entries, computed by 0x3F8C50 from empty weight) is rewritten to `[rocket_parts]` (new goods
+   entries, computed from empty weight; +0x8618 in 1.2.0.8) is rewritten to `[rocket_parts]` (new goods
    only); the workers entry stays; shadow copies (`ident` starting "shadow") are skipped.
 
 ### experts plugin
@@ -141,8 +143,8 @@ to 3.0), OKB-1 `sr_bureau` (730 days, 20 seats, age 30-65, up to 3.6). Test inst
 `days_per_tier = 30` in the deployed copy.
 
 ### resources plugin (port of TesmioLoader's)
-Adds six goods by claiming spare records in the engine's resource vector (RVA 0x9E11C0, 832-byte
-records, 57 live, room for 63; ResourceGet hooked at 0x2AA7B0): `rocket_stage` (template aluminium),
+Adds six goods by claiming spare records in the engine's resource vector (RVA 0xA2B268, 896-byte
+records, 61 live in 1.2.0.8; ResourceGet hooked at 0x2C6230): `rocket_stage` (template aluminium),
 `rocket_engine` (mcomponents), `avionics` (eletronics), `lox` (oil), `hypergolic` (oil),
 `spacecraft` (eletronics). `tools/port_resources.py` regenerates it from the vendored source (ini
 beside the DLL, hooks in TsmPluginStart, safe defaults). It reads `spacerace.ini`: with
@@ -167,54 +169,77 @@ milestone base - 5 % per earlier success of that rocket - 10 % with an engine te
 NK-33 for the N1), floor 5 %; a failure starts a fire (if fires are on) or closes the pad for
 `pad_repair_days`.
 
-## 6. Engine facts used (1.1.1.13)
+## 6. Engine facts used (1.2.0.8)
 
 ```
-game context            static object at RVA 0x9D4F10 (passed to TickAllBuildings)
-  +0x11B08 buildings vector   +0x126A8 persons   +0x12810 vehicles
-  +0x11778 research vector (0xE8 records: name +0, progress float +0xD0, 1.0 = done)
-  +0x590 day  +0x594 year
-building  +0x318 type descriptor (ident "<item>/<object>" at +0, BUILDINGTYPE at +0x360)
+game context            static object at RVA 0xA1EF20 (passed to TickAllBuildings)
+  +0x11BB0 buildings vector   +0x12758 persons   +0x128C0 vehicles
+  +0x11810 research vector (0x138 records: name +0, progress float +0x120, 1.0 = done)
+  +0x5B8 day  +0x5BC year
+building  +0x318 type descriptor (ident "<item>/<object>" at +0, BUILDINGTYPE at +0x368, subtype +0x36C)
           +0x320 C3D_NODE (position via C3DDLL64 C3D_NODE::GetPosition)
-          +0x5B0 parent  +0x5B8 child vector (add with 0x3BB830(game, parent, child))
+          +0x5B0 parent  +0x5B8 child vector (add with 0x3DA6A0(game, parent, child))
           +0x970 std::vector<Storage> (stride 0xE0; storage+0/+8 slot vector of {Resource*, float content, float limit})
           types: STORAGE 5, PRODUCTION_LINE 0x28, AIRPLANE_PARKING 0x2F; airplane subtype 0x21 accepts vehicle types 8 and 10 (helicopter)
 person    +0x40 building it is in now (never home)  +0x58 customs house it immigrated through
-          +0x80 workplace  +0xA8 education  +0xD4 age  +0xE0 health
-vehicle   +0x1708 type (ident at type+0x200)  +0x38A no-sell flag
-          world matrices +0xD60 and +0x1080 (each followed by its inverse), position copies +0xDE0 / +0x1100
-vehicle types   vector at RVA 0x9E7750, stride 0x9F08, bill of parts at +0x85C8
-building types  table at RVA 0x9E6A30, stride 0xBE8; construction phases at +0x370/+0x378
-                (0x21B8-byte records, each a vector of {Resource*, float, pad})
-resources       vector at RVA 0x9E11C0, stride 832, name at +0
-particles       library at [RVA 0x9941F0]+0xF60; C3DDLL64 GetEffect(lib, char*), SpawnParticles(effect, pos*, dir*, 1, 1.0, 1.0, 0)
-building ini    loaded through the fopen import (by the type loader 0x10E1F0; the call was 0x10E37E in 1.1.1.9)
-research.ini    opened by the fopen import after C3DPath_GetFullPath (0x2F3D12 in 1.1.1.9)
-0x3E2840        CanUseBuilding(ctx, building, vehicle type, flag, x)
-0x59B380        ResourceField(vm, name): string-compare chain over vanilla names, unknown -> 0 (= the workers field!)
+          +0x80 workplace  +0xA8 education  +0xD4 age  +0xE0 health (unchanged; record 0x750)
+vehicle   +0x1748 type (ident at type+0x200)  +0x38A no-sell flag
+          two C3D_NODEs at +0xD98 / +0x10B8: world matrices +0xDA0 / +0x10C0 (each followed by its
+          inverse), position copies +0xE20 / +0x1140
+vehicle types   vector at RVA 0xA31810, stride 0xA0C8: kind +0x2B8, bill of parts +0x8618
+building types  table at RVA 0xA30AE8, stride 0xE98 (construction phases: re-measure before use)
+resources       vector at RVA 0xA2B268, stride 0x380 (61 vanilla records), name at +0
+particles       library at [RVA 0x9DDC88]+0x1000; C3DDLL64 GetEffect(lib, char*), SpawnParticles(effect, pos*, dir*, 1, 1.0, 1.0, 0)
+scenario        std::strings at RVA 0xA32708 (scenario) / 0xA32728 (mission), auto-start byte 0xA32748;
+                assign helper 0xA69F0(this, ptr, len)
+building ini    loaded through the fopen import (by the type loader 0x1361F0)
+0x4019C0        CanUseBuilding(ctx, building, vehicle type, flag, x)
+0x5C16E0        ResourceField(vm, name): string-compare chain over vanilla names, unknown -> 0 (= the workers field!)
 ```
 
-### Porting to a new game build (done for 1.1.1.13 on 2026-11-24)
+How the 1.2.0.8 values were found (no 1.1.1.13 executable was left to compare): the game object,
+day/year, building and person lists, building-type and resource tables and their strides come from
+TesmioLoader's 1.2.0.8 port; the rest from the new code - the scenario globals and assign helper
+from the enumeration's tail (same `0x1E45`-byte function), add-child by its shape (null check, then
+`lea rbx,[rdx+0x5B8]`), the vehicle type pointer by usage (`+0x1748`: 2,569 references, 360 followed
+by a `+0x2B8` kind read), the vehicle list and type table by reference counts beside the person
+list (a uniform +0xB0 in the game object), the type stride by the table's index multiplications
+(69 x `imul 0xA0C8`), the bill by the +0x50 shift that moved the trainset list (+0x7C58) and train
+groups (+0x9708), the matrices from `C3D_NODE::GetMatrix` calls (nodes at +0xD98 / +0x10B8, so the
+1.1.1.13 matrices +0xD60 / +0x1080 were node+8), the particle library from the game's GetEffect
+calls (`mov rcx,[rcx+0x1000]`, 54 of 61). **Not yet seen in game.**
 
-A game update moves code, not data: from 1.1.1.9 to 1.1.1.13 `.data` (the game object, the
-scenario strings, the resource and vehicle-type vectors) and every structure offset stayed put,
-while functions moved by region (0, -0x70, -0x80, -0xC0, +0x20, +0x1A0). TesmioLoader's port notes
-(`docs/17-port-v1.1.1.9.md` in its repo) measure the same build. The procedure:
+### Porting to a new game build (1.1.1.13 and 1.2.0.8, both on 2026-11-24)
 
-1. `python tools/port_scan.py` finds every hook's recorded prologue (`k*Pro` arrays) in the new
-   `SOVIET64.exe`, keeps only `.pdata` function starts and prints the distance from the old address.
-   Pick the match at a cluster delta; several matches (a short prologue) need a body check.
-2. The functions the plugins only **call** have no prologue check, so a wrong address crashes
-   instead of refusing: find them from inside the new hooked functions (their call targets and
-   callers - `0x8EB20` is what ScenarioEnumeration calls on `0x9E8648`, add-child is what the
-   building loader calls with the parent's `+0x5B8` list, the group lookup is what 66 callers
-   pass "tram" / "metro" to).
-3. Update the `#define`s with a `v<new>; was 0x...` trail, the manifests (`*.rml.json`:
-   `supportedGameVersions` and the `wrsr.observed.rva_*` symbols) and the address key in
-   `mod/plugins/resources/resources.ini` (it overrides the compiled default). Take the resources
-   plugin from TesmioLoader's matching commit into `vendor/` and run `tools/port_resources.py`.
-4. `python tools/port_scan.py --verify` must report 0 mismatches. Then titles (`[1.1.1.x]`), store
-   pages and the main poster's stamp (`tools/space_thumbs.py`), and the in-game pass.
+1.1.1.9 -> 1.1.1.13 moved only code (by region: 0, -0x70, -0x80, -0xC0, +0x20, +0x1A0). 1.2.0.8
+moved everything: code by +0x14000..+0x27000, `.data` (+0x4A000: every global), and structures
+(game object fields +0x28..+0xB0, building descriptor +0x2B0, vehicle +0x40 after +0x5FC, vehicle
+type +0x24..+0x1C0, research records 0xE8 -> 0x138, resource records 832 -> 896 bytes). TesmioLoader
+ports the same builds (its `docs/17-port-v1.1.1.9.md`, `18-port-v1.1.1.13.md`, `19-port-v1.2.0.8.md`
+and the `v<new>; was` comments in its plugins) - read its diff first. The procedure:
+
+0. **Copy the old `SOVIET64.exe` before the update lands** (`build/game_backup/<version>/`): with both
+   executables, functions and offsets can be paired directly; without, every value has to be
+   re-derived from the new code alone (what this port had to do).
+1. `python tools/port_scan.py <exe>` finds every hook's recorded prologue (`k*Pro` arrays) among the
+   build's `.pdata` function starts and prints the distance from the old address. A prologue that
+   contains a structure offset (`lea rbx,[rcx+0x11790]`) needs a wildcard search; several matches
+   need a body check (e.g. the office tick: the one TickAllBuildings calls, same size).
+2. Functions the plugins only **call** and every offset they read have no prologue check: a wrong
+   one reads garbage or crashes. Re-derive each from the new code (callers, call targets, string
+   arguments, reference counts, strides in `imul`/magic-division constants) and list the evidence.
+3. Update the `#define`s with a `v<new>; was 0x... in <old>` trail, the manifests (`*.rml.json`:
+   `supportedGameVersions`, `wrsr.observed.rva_*`), the address keys in
+   `mod/plugins/resources/resources.ini` (they override compiled defaults); take TesmioLoader's
+   resources plugin for the build into `vendor/` and run `tools/port_resources.py`.
+4. `python tools/port_scan.py --verify <exe>` must report 0 mismatches; then titles, store pages,
+   poster stamps (`tools/space_thumbs.py`), and the in-game pass.
+
+**Hooks never chain onto unknown bytes** (since 2026-11-24): `LiveOrPristine` accepts the expected
+prologue or another plugin's jump (`FF 25`, `E9`, `mov rax/r11, imm64; jmp reg`) and refuses
+anything else. The 1.1.1.9 builds still on the Workshop treat *any* mismatch as "another plugin's
+hook" and hook it - on a newer game they patch unrelated code (seen 2026-11-24: the subscribed
+tramdo hooked three wrong 1.2.0.8 addresses and RML discarded the session).
 
 ## 7. Settings (`mod/plugins/spacerace/spacerace.ini`)
 
@@ -365,7 +390,7 @@ from Steam (no RML, so no plugin loads) and upload from there. Kit and rockets u
 
 ## 12. Links
 
-- RML for 1.1.1.13 (WRSR Ultimate Pack): https://steamcommunity.com/sharedfiles/filedetails/?id=3838038411 -
+- RML (WRSR Ultimate Pack): https://steamcommunity.com/sharedfiles/filedetails/?id=3838038411 -
   https://github.com/Ultimate-Universe/WRSR-RepublicModLoader (docs under `Source/docs/`)
 - TesmioLoader: https://github.com/MaxLegend/TesmioLoader (branch `master`; docs 04 resources)
 - Game data: `media_soviet/scripts/SOVIETInstructions.txt` (the VM API), `buildings_types/*.ini`
